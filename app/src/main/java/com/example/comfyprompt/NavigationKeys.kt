@@ -8,3 +8,5 @@ import kotlinx.serialization.Serializable
 @Serializable data class Result(val imageUrl: String, val seed: Long) : NavKey
 @Serializable data object Settings : NavKey
 @Serializable data object Gallery : NavKey
+@Serializable data object Logs : NavKey
+

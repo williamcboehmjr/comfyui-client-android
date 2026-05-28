@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.example.comfyprompt.network.AppLogger
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
@@ -21,19 +22,45 @@ class SettingsManager(context: Context) {
     
     private val gson = Gson()
 
+    init {
+        migrateLegacyPrefs()
+    }
+
+    private fun migrateLegacyPrefs() {
+        val keysToMigrate = listOf(
+            "gemini_key",
+            "chatgpt_key",
+            "claude_key",
+            "grok_key",
+            "comfy_deploy_api_key",
+            "runpod_api_key",
+            "fal_ai_api_key"
+        )
+        
+        var migrated = false
+        val prefsEditor = prefs.edit()
+        val encryptedPrefsEditor = encryptedPrefs.edit()
+        
+        for (key in keysToMigrate) {
+            if (prefs.contains(key)) {
+                val value = prefs.getString(key, null)
+                if (value != null) {
+                    encryptedPrefsEditor.putString(key, value)
+                    migrated = true
+                }
+                prefsEditor.remove(key)
+            }
+        }
+        
+        if (migrated) {
+            encryptedPrefsEditor.apply()
+            prefsEditor.apply()
+            AppLogger.i("SettingsManager", "Legacy API keys successfully migrated to secure EncryptedSharedPreferences.")
+        }
+    }
+
     private fun getSensitiveKey(key: String, default: String = ""): String {
-        val encryptedValue = encryptedPrefs.getString(key, null)
-        if (encryptedValue != null) {
-            return encryptedValue
-        }
-        val normalValue = prefs.getString(key, null)
-        if (normalValue != null) {
-            // Migrate to encrypted
-            encryptedPrefs.edit().putString(key, normalValue).apply()
-            prefs.edit().remove(key).apply()
-            return normalValue
-        }
-        return default
+        return encryptedPrefs.getString(key, null) ?: default
     }
 
     fun getSettings(): AppSettings {
@@ -152,6 +179,9 @@ class SettingsManager(context: Context) {
             remove("chatgpt_key")
             remove("claude_key")
             remove("grok_key")
+            remove("comfy_deploy_api_key")
+            remove("runpod_api_key")
+            remove("fal_ai_api_key")
             
             apply()
         }

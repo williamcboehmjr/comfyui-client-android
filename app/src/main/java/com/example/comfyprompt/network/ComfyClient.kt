@@ -69,7 +69,7 @@ object ComfyClient {
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.e("ComfyClient", "Failed to fetch saved workflows")
                 onResult(emptyList())
             }
         }
@@ -105,14 +105,14 @@ object ComfyClient {
 
                 // 2. Load workflow JSON — fetch from server if a custom one is selected, else use bundled asset
                 val workflowJsonString = if (settings.workflowToUse == "imported_workflow.json") {
-                    android.util.Log.d("ComfyClient", "Loading imported workflow locally from files storage")
+                    AppLogger.d("ComfyClient", "Loading imported workflow locally from files storage")
                     context.openFileInput("imported_workflow.json").bufferedReader().use { it.readText() }
                 } else if (settings.workflowToUse.isNotBlank()) {
                     val cleanUrl = settings.serverUrl.removeSuffix("/")
                     // ComfyUI's /userdata/{path} endpoint requires the slash in the subpath to be encoded as %2F
                     val encodedPath = java.net.URLEncoder.encode("workflows/${settings.workflowToUse}", "UTF-8").replace("+", "%20")
                     val fetchUrl = "$cleanUrl/userdata/$encodedPath"
-                    android.util.Log.d("ComfyClient", "Fetching workflow: $fetchUrl")
+                    AppLogger.d("ComfyClient", "Fetching workflow: $fetchUrl")
                     val request = Request.Builder().url(fetchUrl).build()
                     client.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) {
@@ -137,7 +137,7 @@ object ComfyClient {
                 } catch (e: Exception) { JsonObject() }
 
                 if (workflowObj.has("nodes")) {
-                    android.util.Log.d("ComfyClient", "Converting UI-format workflow to API format via server endpoint")
+                    AppLogger.d("ComfyClient", "Converting UI-format workflow to API format via server endpoint")
                     progressFlow.value = progressFlow.value.copy(
                         statusText = "Converting workflow on server..."
                     )
@@ -163,7 +163,7 @@ object ComfyClient {
                         val classType = entry.value.asJsonObject.get("class_type")?.asString
                         if (classType != null && !objectInfo.has(classType)) {
                             unknownNodeIds.add(entry.key)
-                            android.util.Log.w("ComfyClient", "Stripping unknown node ${entry.key} [$classType] — not installed on server")
+                            AppLogger.w("ComfyClient", "Stripping unknown node ${entry.key} [$classType] — not installed on server")
                         }
                     }
                     // Remove the unknown nodes from the workflow
@@ -294,7 +294,7 @@ object ComfyClient {
                     if (saveImageId == "760") saveImageId = saveImageCandidates.last()
                 }
                 activeSaveImageNodeId = saveImageId
-                android.util.Log.d("ComfyClient", "Using SaveImage node: $saveImageId")
+                AppLogger.d("ComfyClient", "Using SaveImage node: $saveImageId")
 
                 // Inject prompt, seed, resolution into the API-format workflow
                 var promptInjected = false
@@ -337,7 +337,7 @@ object ComfyClient {
                                     inputs.has("text") -> { inputs.addProperty("text", prompt); promptInjected = true }
                                     inputs.has("Text") -> { inputs.addProperty("Text", prompt); promptInjected = true }
                                 }
-                                android.util.Log.d("ComfyClient", "Injected prompt into primitive string node ${entry.key}")
+                                AppLogger.d("ComfyClient", "Injected prompt into primitive string node ${entry.key}")
                             }
                         }
                     }
@@ -408,7 +408,7 @@ object ComfyClient {
                 // Remove all FluxResolutionNode nodes — they're no longer needed since we injected values directly
                 for (id in fluxResNodeIds) {
                     workflowObj.remove(id)
-                    android.util.Log.d("ComfyClient", "Removed FluxResolutionNode id=$id")
+                    AppLogger.d("ComfyClient", "Removed FluxResolutionNode id=$id")
                 }
 
                 // 3. Serialise final workflow and execute chosen strategy!
@@ -443,7 +443,7 @@ object ComfyClient {
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.e("ComfyClient", "Error during generation")
                 progressFlow.value = ProgressInfo(
                     state = GenerationState.Failed,
                     statusText = "Connection error: ${e.localizedMessage}"
@@ -466,7 +466,7 @@ object ComfyClient {
             }
 
             val jsonBody = gson.toJson(promptRequestBody)
-            android.util.Log.d("ComfyClient", "Sending prompt: $jsonBody")
+            AppLogger.d("ComfyClient", "Sending prompt: $jsonBody")
 
             val request = Request.Builder()
                 .url(promptUrl)
@@ -480,14 +480,14 @@ object ComfyClient {
                         state = GenerationState.Failed,
                         statusText = "Server rejected request: ${response.code}\n$responseBody"
                     )
-                    android.util.Log.e("ComfyClient", "Server error ${response.code}: $responseBody")
+                    AppLogger.e("ComfyClient", "Server error returned HTTP ${response.code}")
                     return@withContext
                 }
 
                 val responseObj = gson.fromJson(responseBody, JsonObject::class.java)
                 currentPromptId = responseObj.get("prompt_id")?.asString
                 
-                android.util.Log.d("ComfyClient", "POST /prompt returned: prompt_id=$currentPromptId, response=$responseBody")
+                AppLogger.d("ComfyClient", "POST /prompt returned: prompt_id=$currentPromptId, response=$responseBody")
 
                 if (currentPromptId == null) {
                     val err = responseObj.get("error")?.asJsonObject
@@ -498,11 +498,11 @@ object ComfyClient {
                         state = GenerationState.Failed,
                         statusText = "Error: $errType - $errMsg\n$errDetails"
                     )
-                    android.util.Log.e("ComfyClient", "ComfyUI Error: $errType - $errMsg - $errDetails")
+                    AppLogger.e("ComfyClient", "ComfyUI returned an execution error")
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.e("ComfyClient", "Exception during execution of local generation")
             progressFlow.value = ProgressInfo(
                 state = GenerationState.Failed,
                 statusText = "Connection error: ${e.localizedMessage}"
@@ -531,7 +531,7 @@ object ComfyClient {
                     statusText = "Generation cancelled."
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.e("ComfyClient", "Exception stopping generation")
             } finally {
                 if (settings.hostType == com.example.comfyprompt.data.HostType.LOCAL) {
                     disconnectWebSocket()
@@ -545,21 +545,21 @@ object ComfyClient {
 
         val cleanUrl = serverUrl.removeSuffix("/").replace("http://", "ws://").replace("https://", "wss://")
         val wsUrl = "$cleanUrl/ws?clientId=$clientId"
-        android.util.Log.d("ComfyClient", "Attempting WebSocket connection to: $wsUrl")
+        AppLogger.d("ComfyClient", "Attempting WebSocket connection to: $wsUrl")
 
         val request = Request.Builder().url(wsUrl).build()
         activeWebSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                android.util.Log.d("ComfyClient", "WebSocket successfully connected to server!")
+                AppLogger.d("ComfyClient", "WebSocket successfully connected to server!")
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                android.util.Log.d("ComfyClient", "WebSocket closed: $code / $reason")
+                AppLogger.d("ComfyClient", "WebSocket closed: $code / $reason")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 try {
-                    android.util.Log.d("ComfyClient", "WebSocket msg: $text")
+                    AppLogger.d("ComfyClient", "WebSocket msg: $text")
                     val msgObj = gson.fromJson(text, JsonObject::class.java)
                     val type = msgObj.get("type")?.asString ?: return
                     val data = msgObj.getAsJsonObject("data") ?: return
@@ -567,7 +567,7 @@ object ComfyClient {
                     val promptId = data.get("prompt_id")?.asString
                     // Ensure the WebSocket events belong to our active generation
                     if (promptId != null && currentPromptId != null && promptId != currentPromptId) {
-                        android.util.Log.d("ComfyClient", "Ignoring WebSocket message for old promptId: $promptId")
+                        AppLogger.d("ComfyClient", "Ignoring WebSocket message for old promptId: $promptId")
                         return
                     }
 
@@ -643,12 +643,12 @@ object ComfyClient {
                         }
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    AppLogger.e("ComfyClient", "Exception handling WebSocket message")
                 }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                android.util.Log.e("ComfyClient", "WebSocket connection failed: ${t.localizedMessage}", t)
+                AppLogger.e("ComfyClient", "WebSocket connection failed")
                 // Only show connection error if we aren't already completed/cancelled
                 if (progressFlow.value.state != GenerationState.Completed && 
                     progressFlow.value.state != GenerationState.Cancelled) {
@@ -678,7 +678,7 @@ object ComfyClient {
         try {
             activeWebSocket?.close(1000, "Clean closure")
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.e("ComfyClient", "Exception disconnecting WebSocket")
         }
         activeWebSocket = null
     }
@@ -738,7 +738,7 @@ object ComfyClient {
                 return@withContext ConversionResult.Success(responseBody)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.e("ComfyClient", "Exception converting workflow")
             return@withContext ConversionResult.Error.Generic(e.localizedMessage ?: "Unknown error occurred")
         }
     }
@@ -777,7 +777,7 @@ object ComfyClient {
                 val existing = valEl.asString
                 if (isPositivePrompt(existing)) {
                     inputs.addProperty(key, prompt)
-                    android.util.Log.d("ComfyClient", "Recursively overrode direct string in node $nodeId key $key")
+                    AppLogger.d("ComfyClient", "Recursively overrode direct string in node $nodeId key $key")
                     return true
                 }
             }

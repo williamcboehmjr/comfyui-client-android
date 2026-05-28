@@ -12,6 +12,7 @@ import com.example.comfyprompt.theme.ComfyPromptTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.example.comfyprompt.network.AppLogger.init(applicationContext)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {

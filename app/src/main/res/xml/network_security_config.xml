@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Default: Allow cleartext (HTTP) for local ComfyUI connections and debugging -->
+    <base-config cleartextTrafficPermitted="true" />
+
+    <!-- Require HTTPS (block cleartext) for cloud services -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">openai.com</domain>
+        <domain includeSubdomains="true">api.openai.com</domain>
+        <domain includeSubdomains="true">anthropic.com</domain>
+        <domain includeSubdomains="true">api.anthropic.com</domain>
+        <domain includeSubdomains="true">runpod.io</domain>
+        <domain includeSubdomains="true">runpod.net</domain>
+        <domain includeSubdomains="true">api.runpod.ai</domain>
+        <domain includeSubdomains="true">fal.ai</domain>
+        <domain includeSubdomains="true">fal.run</domain>
+        <domain includeSubdomains="true">comfydeploy.com</domain>
+        <domain includeSubdomains="true">google.com</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">generativelanguage.googleapis.com</domain>
+        <domain includeSubdomains="true">x.ai</domain>
+        <domain includeSubdomains="true">api.x.ai</domain>
+    </domain-config>
+</network-security-config>

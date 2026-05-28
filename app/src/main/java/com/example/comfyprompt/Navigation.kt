@@ -18,6 +18,7 @@ import com.example.comfyprompt.ui.screens.PromptScreen
 import com.example.comfyprompt.ui.screens.ResultScreen
 import com.example.comfyprompt.ui.screens.SettingsScreen
 import com.example.comfyprompt.ui.screens.GalleryScreen
+import com.example.comfyprompt.ui.screens.LogsScreen
 
 @Composable
 fun MainNavigation(viewModel: MainViewModel = viewModel()) {
@@ -27,6 +28,7 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
     val settings by viewModel.settings.collectAsState()
     val progressInfo by viewModel.progressInfo.collectAsState()
     val prompt by viewModel.currentPrompt.collectAsState()
+    val cooldownSeconds by viewModel.generateCooldownSeconds.collectAsState()
 
     // Monitor active generation flow to auto-navigate
     LaunchedEffect(progressInfo.state) {
@@ -91,7 +93,8 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                     onAspectRatioChange = { ar ->
                         val updated = settings.copy(aspectRatio = ar)
                         viewModel.updateSettings(updated)
-                    }
+                    },
+                    cooldownSeconds = cooldownSeconds
                 )
             }
             entry<Progress> {
@@ -139,7 +142,13 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                         backStack.removeLastOrNull()
                     },
                     onBackClick = { backStack.removeLastOrNull() },
-                    onDownloadWorkflowClick = { viewModel.downloadWorkflow() }
+                    onDownloadWorkflowClick = { viewModel.downloadWorkflow() },
+                    onViewLogsClick = { backStack.add(Logs) }
+                )
+            }
+            entry<Logs> {
+                LogsScreen(
+                    onBackClick = { backStack.removeLastOrNull() }
                 )
             }
             entry<Gallery> {

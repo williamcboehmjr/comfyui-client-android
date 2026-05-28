@@ -30,7 +30,7 @@ object GeminiClient {
         }
 
         if (provider != "Local / Custom" && apiKey.isBlank()) {
-            android.util.Log.d("GeminiClient", "$provider API key is blank. Bypassing enhancer.")
+            AppLogger.d("GeminiClient", "$provider API key is blank. Bypassing enhancer.")
             return@withContext userPrompt // Fallback to raw prompt if no API key is set
         }
 
@@ -65,7 +65,7 @@ object GeminiClient {
                     client.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
-                            android.util.Log.e("GeminiClient", "ChatGPT API failed with code: ${response.code}, body: $bodyString")
+                            AppLogger.e("GeminiClient", "ChatGPT API request failed with HTTP ${response.code}")
                             return@withContext userPrompt
                         }
                         val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
@@ -75,7 +75,7 @@ object GeminiClient {
                             if (message != null) {
                                 val enhancedText = message.get("content").asString.trim()
                                 if (enhancedText.isNotEmpty()) {
-                                    android.util.Log.d("GeminiClient", "ChatGPT enhanced prompt: $enhancedText")
+                                    AppLogger.d("GeminiClient", "ChatGPT enhanced prompt: $enhancedText")
                                     return@withContext enhancedText
                                 }
                             }
@@ -103,7 +103,7 @@ object GeminiClient {
                     client.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
-                            android.util.Log.e("GeminiClient", "Grok API failed with code: ${response.code}, body: $bodyString")
+                            AppLogger.e("GeminiClient", "Grok API request failed with HTTP ${response.code}")
                             return@withContext userPrompt
                         }
                         val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
@@ -113,7 +113,7 @@ object GeminiClient {
                             if (message != null) {
                                 val enhancedText = message.get("content").asString.trim()
                                 if (enhancedText.isNotEmpty()) {
-                                    android.util.Log.d("GeminiClient", "Grok enhanced prompt: $enhancedText")
+                                    AppLogger.d("GeminiClient", "Grok enhanced prompt: $enhancedText")
                                     return@withContext enhancedText
                                 }
                             }
@@ -141,7 +141,7 @@ object GeminiClient {
                     client.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
-                            android.util.Log.e("GeminiClient", "Local LLM API failed with code: ${response.code}, body: $bodyString")
+                            AppLogger.e("GeminiClient", "Local LLM API request failed with HTTP ${response.code}")
                             return@withContext userPrompt
                         }
                         val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
@@ -151,7 +151,7 @@ object GeminiClient {
                             if (message != null) {
                                 val enhancedText = message.get("content").asString.trim()
                                 if (enhancedText.isNotEmpty()) {
-                                    android.util.Log.d("GeminiClient", "Local LLM enhanced prompt: $enhancedText")
+                                    AppLogger.d("GeminiClient", "Local LLM enhanced prompt: $enhancedText")
                                     return@withContext enhancedText
                                 }
                             }
@@ -181,7 +181,7 @@ object GeminiClient {
                     client.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
-                            android.util.Log.e("GeminiClient", "Claude API failed with code: ${response.code}, body: $bodyString")
+                            AppLogger.e("GeminiClient", "Claude API request failed with HTTP ${response.code}")
                             return@withContext userPrompt
                         }
                         val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
@@ -191,7 +191,7 @@ object GeminiClient {
                             if (textObj != null) {
                                 val enhancedText = textObj.get("text").asString.trim()
                                 if (enhancedText.isNotEmpty()) {
-                                    android.util.Log.d("GeminiClient", "Claude enhanced prompt: $enhancedText")
+                                    AppLogger.d("GeminiClient", "Claude enhanced prompt: $enhancedText")
                                     return@withContext enhancedText
                                 }
                             }
@@ -208,7 +208,7 @@ object GeminiClient {
                     }
                     val cleanModel = if (mappedModel.contains("/")) mappedModel else "models/$mappedModel"
                     val url = "https://generativelanguage.googleapis.com/v1beta/$cleanModel:generateContent?key=$apiKey"
-                    android.util.Log.d("GeminiClient", "Starting prompt enhancement with model: $cleanModel (mapped from: ${settings.geminiModel})")
+                    AppLogger.d("GeminiClient", "Starting prompt enhancement with model: $cleanModel (mapped from: ${settings.geminiModel})")
 
                     val jsonRequest = mapOf(
                         "contents" to listOf(
@@ -235,11 +235,11 @@ object GeminiClient {
                     client.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
-                            android.util.Log.e("GeminiClient", "Gemini API failed with code: ${response.code}, body: $bodyString")
+                            AppLogger.e("GeminiClient", "Gemini API request failed with HTTP ${response.code}")
                             return@withContext userPrompt
                         }
                         
-                        android.util.Log.d("GeminiClient", "Gemini API response successful: $bodyString")
+                        AppLogger.d("GeminiClient", "Gemini API response successful: $bodyString")
                         val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
                         val candidates = jsonObject.getAsJsonArray("candidates")
                         if (candidates != null && candidates.size() > 0) {
@@ -248,7 +248,7 @@ object GeminiClient {
                             if (parts != null && parts.size() > 0) {
                                 val enhancedText = parts[0].asJsonObject.get("text").asString.trim()
                                 if (enhancedText.isNotEmpty()) {
-                                    android.util.Log.d("GeminiClient", "Successfully enhanced prompt: $enhancedText")
+                                    AppLogger.d("GeminiClient", "Successfully enhanced prompt: $enhancedText")
                                     return@withContext enhancedText
                                 }
                             }
@@ -258,7 +258,7 @@ object GeminiClient {
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e("GeminiClient", "Exception during prompt enhancement", e)
+            AppLogger.e("GeminiClient", "Prompt enhancement failed due to an exception")
             userPrompt
         }
     }
@@ -275,7 +275,7 @@ object GeminiClient {
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    android.util.Log.e("GeminiClient", "fetchLocalModels failed: HTTP ${response.code}")
+                    AppLogger.e("GeminiClient", "Failed to fetch local models with HTTP ${response.code}")
                     return@withContext emptyList()
                 }
                 val bodyString = response.body?.string() ?: return@withContext emptyList()
@@ -293,7 +293,7 @@ object GeminiClient {
                 models
             }
         } catch (e: Exception) {
-            android.util.Log.e("GeminiClient", "Exception during fetchLocalModels", e)
+            AppLogger.e("GeminiClient", "Failed to fetch local models due to an exception")
             emptyList()
         }
     }

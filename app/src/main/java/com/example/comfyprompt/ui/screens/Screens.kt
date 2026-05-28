@@ -53,6 +53,8 @@ import com.example.comfyprompt.data.GenerationState
 import com.example.comfyprompt.data.ProgressInfo
 import com.example.comfyprompt.data.SeedMode
 import com.example.comfyprompt.data.HostType
+import com.example.comfyprompt.network.UrlValidator
+import com.example.comfyprompt.network.ValidationResult
 import com.example.comfyprompt.theme.AccentGray
 import com.example.comfyprompt.theme.AccentRed
 import com.example.comfyprompt.theme.CardGray
@@ -130,7 +132,8 @@ fun PromptScreen(
     onEnhancerToggle: (Boolean) -> Unit,
     onSeedModeChange: (SeedMode, Long) -> Unit,
     onMegapixelChange: (String) -> Unit,
-    onAspectRatioChange: (String) -> Unit
+    onAspectRatioChange: (String) -> Unit,
+    cooldownSeconds: Int = 0
 ) {
     var seedInput by remember { mutableStateOf(settings.customSeedValue.toString()) }
     val context = LocalContext.current
@@ -573,16 +576,20 @@ fun PromptScreen(
                     Toast.makeText(context, "Please enter a prompt.", Toast.LENGTH_SHORT).show()
                 }
             },
+            enabled = cooldownSeconds <= 0,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.White,
-                contentColor = Color.Black
+                contentColor = Color.Black,
+                disabledContainerColor = DarkGray,
+                disabledContentColor = AccentGray
             ),
             shape = RoundedCornerShape(28.dp)
         ) {
-            Text("GENERATE", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 16.sp)
+            val buttonText = if (cooldownSeconds > 0) "COOLDOWN ($cooldownSeconds)" else "GENERATE"
+            Text(buttonText, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 16.sp)
         }
     }
 
@@ -1135,7 +1142,8 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     onDownloadWorkflowClick: () -> Unit,
     localModels: List<String> = emptyList(),
-    onFetchLocalModelsClick: (String) -> Unit = {}
+    onFetchLocalModelsClick: (String) -> Unit = {},
+    onViewLogsClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var hasImportedLocalWorkflow by remember(importState) {
@@ -1180,6 +1188,14 @@ fun SettingsScreen(
     var showComfyDeployApiKey by remember { mutableStateOf(false) }
     var showRunpodApiKey by remember { mutableStateOf(false) }
     var showFalAiApiKey by remember { mutableStateOf(false) }
+
+    val isSaveEnabled = remember(selectedHostType, localIpAddress) {
+        if (selectedHostType == HostType.LOCAL) {
+            UrlValidator.validateUrl(localIpAddress) !is ValidationResult.Error
+        } else {
+            true
+        }
+    }
 
     val providers = listOf("Gemini", "ChatGPT", "Claude", "Grok", "Local / Custom")
     val formats = listOf("PNG", "JPEG", "WEBP")
@@ -1317,19 +1333,45 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = AccentGray
                             )
+                            val validation = remember(localIpAddress) {
+                                UrlValidator.validateUrl(localIpAddress)
+                            }
                             OutlinedTextField(
                                 value = localIpAddress,
                                 onValueChange = { localIpAddress = it },
                                 modifier = Modifier.fillMaxWidth(),
+                                isError = validation is ValidationResult.Error,
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Color.White,
                                     unfocusedBorderColor = AccentGray,
                                     focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
+                                    unfocusedTextColor = Color.White,
+                                    errorBorderColor = AccentRed
                                 ),
                                 shape = RoundedCornerShape(8.dp),
                                 placeholder = { Text("http://10.0.2.2:8188", color = AccentGray) }
                             )
+                            when (validation) {
+                                is ValidationResult.Public -> {
+                                    Text(
+                                        text = "Ensure this is YOUR server - API keys at risk on untrusted endpoints",
+                                        color = AccentRed,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                                is ValidationResult.Error -> {
+                                    Text(
+                                        text = validation.message,
+                                        color = AccentRed,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                                else -> {}
+                            }
                         }
                     }
 
@@ -1901,6 +1943,39 @@ fun SettingsScreen(
                 }
             }
 
+            // Diagnostics & Logs Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CardGray),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "DIAGNOSTICS & LOGS",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentGray
+                    )
+                    Text(
+                        "View application logs for troubleshooting connection or generation errors.",
+                        fontSize = 13.sp,
+                        color = LightGray
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Button(
+                        onClick = onViewLogsClick,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Text("VIEW SYSTEM LOGS", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // Action Button: Save Settings
@@ -1932,12 +2007,13 @@ fun SettingsScreen(
                     )
                     onSaveClick(updatedSettings)
                 },
+                enabled = isSaveEnabled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Black
+                    containerColor = if (isSaveEnabled) Color.White else AccentGray,
+                    contentColor = if (isSaveEnabled) Color.Black else Color.White
                 ),
                 shape = RoundedCornerShape(28.dp)
             ) {

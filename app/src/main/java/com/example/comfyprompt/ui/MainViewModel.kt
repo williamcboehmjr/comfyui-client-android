@@ -22,6 +22,9 @@ import com.example.comfyprompt.data.FormatType
 import com.example.comfyprompt.data.ConversionResult
 import com.example.comfyprompt.network.ComfyClient
 import com.example.comfyprompt.network.GeminiClient
+import com.example.comfyprompt.network.UrlValidator
+import com.example.comfyprompt.network.ValidationResult
+import com.example.comfyprompt.network.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -106,6 +109,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _currentPrompt = MutableStateFlow(settingsManager.getLastPrompt())
     val currentPrompt: StateFlow<String> = _currentPrompt.asStateFlow()
+
+    private val _generateCooldownSeconds = MutableStateFlow(0)
+    val generateCooldownSeconds: StateFlow<Int> = _generateCooldownSeconds.asStateFlow()
 
     private val _galleryItems = MutableStateFlow(settingsManager.getGalleryItems())
     val galleryItems: StateFlow<List<GalleryItem>> = _galleryItems.asStateFlow()
@@ -194,6 +200,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val progressInfo: StateFlow<ProgressInfo> = ComfyClient.progressFlow
 
     fun updateSettings(newSettings: AppSettings) {
+        if (newSettings.hostType == com.example.comfyprompt.data.HostType.LOCAL) {
+            val validation = UrlValidator.validateUrl(newSettings.localIpAddress)
+            if (validation is ValidationResult.Error) {
+                return
+            }
+        }
         val serverUrlChanged = _settings.value.serverUrl != newSettings.serverUrl
         _settings.value = newSettings
         settingsManager.saveSettings(newSettings)
@@ -203,6 +215,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun generateImage(prompt: String) {
+        if (_generateCooldownSeconds.value > 0) {
+            AppLogger.w("MainViewModel", "Generate image blocked: active cooldown is ${_generateCooldownSeconds.value} seconds.")
+            return
+        }
+        AppLogger.i("MainViewModel", "Generate image triggered. Starting 5-second cooldown.")
+        _generateCooldownSeconds.value = 5
+        viewModelScope.launch {
+            while (_generateCooldownSeconds.value > 0) {
+                kotlinx.coroutines.delay(1000)
+                _generateCooldownSeconds.value = _generateCooldownSeconds.value - 1
+            }
+            AppLogger.i("MainViewModel", "Cooldown complete. Generation unlocked.")
+        }
+
         _currentPrompt.value = prompt
         viewModelScope.launch {
             val currentSettings = _settings.value
