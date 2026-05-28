@@ -665,7 +665,9 @@ fun PromptScreen(
 fun ProgressScreen(
     progressInfo: ProgressInfo,
     prompt: String,
-    onStopClick: () -> Unit
+    onStopClick: () -> Unit,
+    onSaveClick: (String) -> Unit,
+    onShareClick: (String) -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isExpandedScreen = configuration.screenWidthDp >= 600
@@ -789,16 +791,62 @@ fun ProgressScreen(
     }
 
     val stopButton = @Composable {
-        OutlinedButton(
-            onClick = onStopClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
-            border = BorderStroke(1.dp, AccentRed),
-            shape = RoundedCornerShape(28.dp)
-        ) {
-            Text("STOP GENERATION", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        if (progressInfo.state == GenerationState.Completed) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = { onSaveClick(progressInfo.finalImage ?: "") },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(28.dp)
+                ) {
+                    Text("DOWNLOAD", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 16.sp)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { onShareClick(progressInfo.finalImage ?: "") },
+                            modifier = Modifier.fillMaxSize(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = BorderStroke(1.dp, Color.White),
+                            shape = RoundedCornerShape(28.dp)
+                        ) {
+                            Text("SHARE", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        }
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = onStopClick,
+                            modifier = Modifier.fillMaxSize(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = BorderStroke(1.dp, Color.White),
+                            shape = RoundedCornerShape(28.dp)
+                        ) {
+                            Text("FINISH (GO BACK)", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        }
+                    }
+                }
+            }
+        } else {
+            OutlinedButton(
+                onClick = onStopClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentRed),
+                border = BorderStroke(1.dp, AccentRed),
+                shape = RoundedCornerShape(28.dp)
+            ) {
+                Text("STOP GENERATION", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            }
         }
     }
 
@@ -903,7 +951,7 @@ fun ResultScreen(
             border = BorderStroke(1.dp, Color.White),
             shape = RoundedCornerShape(28.dp)
         ) {
-            Text("RE-RUN", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Text("FINISH (GO BACK)", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
     }
 
@@ -933,7 +981,7 @@ fun ResultScreen(
             ),
             shape = RoundedCornerShape(28.dp)
         ) {
-            Text("DOWNLOAD TO DEVICE", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 16.sp)
+            Text("DOWNLOAD", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 16.sp)
         }
     }
 

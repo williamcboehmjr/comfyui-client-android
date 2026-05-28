@@ -98,7 +98,9 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                 ProgressScreen(
                     progressInfo = progressInfo,
                     prompt = prompt,
-                    onStopClick = { viewModel.stopGeneration() }
+                    onStopClick = { viewModel.stopGeneration() },
+                    onSaveClick = { imageUrl -> viewModel.saveImageToDownloads(imageUrl, settings.outputFormat) },
+                    onShareClick = { imageUrl -> viewModel.shareImage(imageUrl) }
                 )
             }
             entry<Result> { key ->

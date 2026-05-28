@@ -497,7 +497,6 @@ object ComfyClient {
                                 if (progressFlow.value.state != GenerationState.Completed && 
                                     progressFlow.value.state != GenerationState.Cancelled && 
                                     progressFlow.value.state != GenerationState.Failed) {
-                                    // Check if we already loaded the final image, otherwise finalize
                                     val current = progressFlow.value
                                     if (current.finalImage != null) {
                                         progressFlow.value = current.copy(
@@ -505,6 +504,7 @@ object ComfyClient {
                                             percent = 1f,
                                             statusText = "Completed successfully."
                                         )
+                                        disconnectWebSocket()
                                     }
                                 }
                             } else {
@@ -533,9 +533,14 @@ object ComfyClient {
                                     val imageUrl = "${serverUrl.removeSuffix("/")}/view?filename=$filename&type=output"
                                     
                                     val current = progressFlow.value
+                                    
+                                    // Update finalImage candidate dynamically for ANY executed image node
+                                    progressFlow.value = current.copy(
+                                        finalImage = imageUrl
+                                    )
+                                    
                                     if (node == activeSaveImageNodeId) {
-                                        progressFlow.value = current.copy(
-                                            finalImage = imageUrl,
+                                        progressFlow.value = progressFlow.value.copy(
                                             state = GenerationState.Completed,
                                             percent = 1f,
                                             statusText = "Completed successfully."
