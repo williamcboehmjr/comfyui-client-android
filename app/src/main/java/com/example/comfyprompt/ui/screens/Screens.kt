@@ -1946,14 +1946,14 @@ fun SettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "To import standard UI workflows, please either:",
+                        text = "This workflow is in the visual UI format, not the required API format. The app cannot convert this locally. To use it, please choose one of the following:",
                         color = LightGray,
                         fontSize = 14.sp
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("•", color = Color.White)
                         Text(
-                            text = "Install 'Workflow to API Converter Endpoint' via ComfyUI Manager.",
+                            text = "Option A: Open ComfyUI Manager on your PC, search for and install 'Workflow to API Converter Endpoint' (by SethRobinson). Once installed, this app will convert files automatically.",
                             color = LightGray,
                             fontSize = 14.sp
                         )
@@ -1961,7 +1961,7 @@ fun SettingsScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("•", color = Color.White)
                         Text(
-                            text = "Enable 'Dev mode Options' in ComfyUI and click 'Save (API format)'.",
+                            text = "Option B: In ComfyUI, enable 'Dev mode Options', click 'Save (API format)', and import that new file instead.",
                             color = LightGray,
                             fontSize = 14.sp
                         )
