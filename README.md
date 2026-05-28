@@ -8,7 +8,9 @@
 **ComfyUI Client** is a state-of-the-art, fully native Android application designed to interface with any ComfyUI server. It allows you to run complex stable diffusion workflows, customize prompts, generate images, and manage generation parameters directly from your pocket.
 
 <p align="center">
-  <img src="screenshots/main_screen.png" width="300" alt="ComfyUI Client Interface"/>
+  <img src="screenshots/main_screen.png" width="260" alt="Main Interface"/>
+  <img src="screenshots/settings_screen.png" width="260" alt="Settings Screen"/>
+  <img src="screenshots/generating_screen.png" width="260" alt="Generation Processing"/>
 </p>
 
 > [!NOTE]
