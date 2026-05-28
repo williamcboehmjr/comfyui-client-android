@@ -1,6 +1,7 @@
 package com.example.comfyprompt.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -891,12 +892,13 @@ fun ProgressScreen(
                 }
             }
         } else {
-            // Folded stacked Column layout
+            // Folded stacked Column layout — scrollable to prevent clinking or warping
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(24.dp),
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
@@ -916,8 +918,8 @@ fun ProgressScreen(
 
                 Box(
                     modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
+                        .height(350.dp)
                 ) {
                     imageCanvas()
                 }
@@ -1003,6 +1005,10 @@ fun ResultScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        BackHandler(enabled = isFullScreen) {
+            isFullScreen = false
+        }
+
         Scaffold(
             containerColor = Color.Black
         ) { paddingValues ->
