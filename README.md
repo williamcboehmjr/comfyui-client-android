@@ -53,15 +53,22 @@ This is a modern Android codebase built with the following industry-standard tec
 ## 🚀 Getting Started
 
 ### Prerequisites
-1.  **Enable Dev Mode in ComfyUI**: You **must** enable Developer Mode in your ComfyUI web interface settings to allow proper API workflow handling. Open ComfyUI in your browser, click the settings gear icon, and check **"Enable Dev mode"**.
-2.  Ensure your ComfyUI server is running and accessible over your local network or via a public tunnel (e.g., ngrok).
-3.  For testing on the Android Emulator, the default connection is configured to loop back to the emulator host at `http://10.0.2.2:8188`.
+1.  **Install the API Converter Extension**:
+    To run raw custom workflows in "UI-format", your ComfyUI server must have the [Workflow to API Converter Endpoint](https://github.com/SethRobinson/comfyui-api-endpoint) extension installed:
+    *   Open ComfyUI, open **ComfyUI Manager**, and search for `"Workflow to API Converter Endpoint"`.
+    *   Click **Install** and restart your ComfyUI server.
+    *   *Note*: The API converter automatically respects **Muted** (`mode: 2`) and **Bypassed** (`mode: 4`) nodes, skipping or bridging them cleanly. Keep this in mind when designing your graphs.
+    *   *Note*: This extension is **not** required if you import workflows pre-saved in API-format (via Developer Mode in ComfyUI Web UI) or use the built-in workflow.
+2.  **Enable Dev Mode in ComfyUI** (Optional): If you prefer to manually import pre-converted API-format workflows directly, enable Developer Mode in your ComfyUI web interface settings: open the settings gear icon, and check **"Enable Dev mode"**. Then click **"Save (API format)"** to download the converted JSON.
+3.  Ensure your ComfyUI server is running and accessible over your local network or via a public tunnel (e.g., ngrok).
+4.  For testing on the Android Emulator, the default connection is configured to loop back to the emulator host at `http://10.0.2.2:8188`.
 
 ### Building from Source
 You can compile and run the project using Android Studio or directly via the terminal:
 
 ```bash
 # Clean and assemble the debug APK
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew assembleDebug
 
 # Install to a connected device or emulator
@@ -74,6 +81,7 @@ You can compile and run the project using Android Studio or directly via the ter
 
 We are active developers looking to mold this client into the ultimate mobile generative experience. Here is what is planned next:
 
+*   **Toggle Groups**: Support for toggling LiteGraph groups directly from the Android app UI to enable/disable entire workflow segments.
 *   **Cloud Host Integrations**: Support for direct orchestration with GPU providers like **RunPod** and other serverless compute providers.
 *   **Server Queue Management**: Full native interfaces to queue, pause, clear, and prioritize ComfyUI jobs directly from the device.
 *   **Mobile-Optimized Tweaks**: Custom user interfaces for editing seed models, sampler configurations, and native node parameters in simple cards.

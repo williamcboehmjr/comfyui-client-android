@@ -137,8 +137,22 @@ object ComfyClient {
                 } catch (e: Exception) { JsonObject() }
 
                 if (workflowObj.has("nodes")) {
-                    android.util.Log.d("ComfyClient", "Converting UI-format workflow to API format")
-                    workflowObj = convertUiFormatToApi(workflowObj, objectInfo)
+                    android.util.Log.d("ComfyClient", "Converting UI-format workflow to API format via server endpoint")
+                    progressFlow.value = progressFlow.value.copy(
+                        statusText = "Converting workflow on server..."
+                    )
+                    val conversionResult = convertWorkflowToApi(workflowJsonString, settings.serverUrl)
+                    when (conversionResult) {
+                        is ConversionResult.Success -> {
+                            workflowObj = gson.fromJson(conversionResult.apiJson, JsonObject::class.java)
+                        }
+                        is ConversionResult.Error.MissingExtension -> {
+                            throw Exception("Failed to convert UI workflow. The server is missing the 'Workflow to API Converter Endpoint' extension. Please install it via ComfyUI Manager or import an API-format JSON.")
+                        }
+                        is ConversionResult.Error.Generic -> {
+                            throw Exception("Failed to convert UI workflow on server: ${conversionResult.message}")
+                        }
+                    }
                 }
 
                 // Strip any nodes whose class_type is not installed on this ComfyUI server.
@@ -290,47 +304,40 @@ object ComfyClient {
                     val inputs = node.getAsJsonObject("inputs") ?: return@forEach
 
                     // A. Positive prompt injection
-                    // Covers: CLIPTextEncode with direct text, or linked via primitive/string node
+                    // Covers: CLIPTextEncode with direct text, or linked via primitive/string/DF_Text_Box node
                     if (classType == "CLIPTextEncode") {
                         val textVal = inputs.get("text")
-                        when {
-                            textVal == null -> { /* skip */ }
-                            textVal.isJsonPrimitive && textVal.asJsonPrimitive.isString -> {
-                                // Direct string value — inject if it looks like a prompt (not blank/negative)
-                                // We inject into ALL CLIPTextEncode nodes with non-empty text
-                                // (negative prompts are usually empty or very short)
-                                val existing = textVal.asString
-                                if (existing.isNotBlank()) {
-                                    inputs.addProperty("text", prompt)
-                                    promptInjected = true
-                                    android.util.Log.d("ComfyClient", "Injected prompt into CLIPTextEncode ${entry.key}")
+                        if (textVal != null) {
+                            val isPos = when {
+                                textVal.isJsonPrimitive && textVal.asJsonPrimitive.isString -> {
+                                    isPositivePrompt(textVal.asString)
+                                }
+                                else -> {
+                                    val title = node.get("title")?.asString?.lowercase() ?: ""
+                                    !title.contains("negative") && !title.contains("neg")
                                 }
                             }
-                            textVal.isJsonArray -> {
-                                // Linked from another node — follow the link
-                                val originId = textVal.asJsonArray[0].asString
-                                val originNode = workflowObj.getAsJsonObject(originId)
-                                originNode?.getAsJsonObject("inputs")?.apply {
-                                    when {
-                                        has("value") -> { addProperty("value", prompt); promptInjected = true }
-                                        has("string") -> { addProperty("string", prompt); promptInjected = true }
-                                        has("text") -> { addProperty("text", prompt); promptInjected = true }
-                                    }
-                                    android.util.Log.d("ComfyClient", "Injected prompt via linked node $originId")
+                            if (isPos) {
+                                if (overrideTextNode(entry.key, workflowObj, prompt)) {
+                                    promptInjected = true
                                 }
                             }
                         }
                     }
 
-                    // Primitive/String nodes that feed directly into CLIPTextEncode
+                    // Primitive/String nodes that feed directly into CLIPTextEncode (including custom DF_Text_Box)
                     if (classType == "PrimitiveNode" || classType == "PrimitiveStringMultiline" ||
-                        classType == "PrimitiveString" || classType == "StringNode") {
-                        val valEl = inputs.get("value") ?: inputs.get("string") ?: inputs.get("text")
-                        if (valEl?.isJsonPrimitive == true && valEl.asJsonPrimitive.isString && valEl.asString.isNotBlank()) {
-                            when {
-                                inputs.has("value") -> { inputs.addProperty("value", prompt); promptInjected = true }
-                                inputs.has("string") -> { inputs.addProperty("string", prompt); promptInjected = true }
-                                inputs.has("text") -> { inputs.addProperty("text", prompt); promptInjected = true }
+                        classType == "PrimitiveString" || classType == "StringNode" || classType == "DF_Text_Box") {
+                        val valEl = inputs.get("value") ?: inputs.get("string") ?: inputs.get("text") ?: inputs.get("Text")
+                        if (valEl?.isJsonPrimitive == true && valEl.asJsonPrimitive.isString) {
+                            if (isPositivePrompt(valEl.asString)) {
+                                when {
+                                    inputs.has("value") -> { inputs.addProperty("value", prompt); promptInjected = true }
+                                    inputs.has("string") -> { inputs.addProperty("string", prompt); promptInjected = true }
+                                    inputs.has("text") -> { inputs.addProperty("text", prompt); promptInjected = true }
+                                    inputs.has("Text") -> { inputs.addProperty("Text", prompt); promptInjected = true }
+                                }
+                                android.util.Log.d("ComfyClient", "Injected prompt into primitive string node ${entry.key}")
                             }
                         }
                     }
@@ -479,12 +486,19 @@ object ComfyClient {
 
                 val responseObj = gson.fromJson(responseBody, JsonObject::class.java)
                 currentPromptId = responseObj.get("prompt_id")?.asString
+                
+                android.util.Log.d("ComfyClient", "POST /prompt returned: prompt_id=$currentPromptId, response=$responseBody")
 
                 if (currentPromptId == null) {
+                    val err = responseObj.get("error")?.asJsonObject
+                    val errType = err?.get("type")?.asString ?: "Unknown"
+                    val errMsg = err?.get("message")?.asString ?: "Server failed to return prompt ID"
+                    val errDetails = err?.get("details")?.asString ?: ""
                     progressFlow.value = ProgressInfo(
                         state = GenerationState.Failed,
-                        statusText = "Server failed to return prompt ID"
+                        statusText = "Error: $errType - $errMsg\n$errDetails"
                     )
+                    android.util.Log.e("ComfyClient", "ComfyUI Error: $errType - $errMsg - $errDetails")
                 }
             }
         } catch (e: Exception) {
@@ -531,20 +545,51 @@ object ComfyClient {
 
         val cleanUrl = serverUrl.removeSuffix("/").replace("http://", "ws://").replace("https://", "wss://")
         val wsUrl = "$cleanUrl/ws?clientId=$clientId"
+        android.util.Log.d("ComfyClient", "Attempting WebSocket connection to: $wsUrl")
 
         val request = Request.Builder().url(wsUrl).build()
         activeWebSocket = client.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                android.util.Log.d("ComfyClient", "WebSocket successfully connected to server!")
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                android.util.Log.d("ComfyClient", "WebSocket closed: $code / $reason")
+            }
+
             override fun onMessage(webSocket: WebSocket, text: String) {
                 try {
+                    android.util.Log.d("ComfyClient", "WebSocket msg: $text")
                     val msgObj = gson.fromJson(text, JsonObject::class.java)
                     val type = msgObj.get("type")?.asString ?: return
                     val data = msgObj.getAsJsonObject("data") ?: return
 
                     val promptId = data.get("prompt_id")?.asString
                     // Ensure the WebSocket events belong to our active generation
-                    if (promptId != null && promptId != currentPromptId) return
+                    if (promptId != null && currentPromptId != null && promptId != currentPromptId) {
+                        android.util.Log.d("ComfyClient", "Ignoring WebSocket message for old promptId: $promptId")
+                        return
+                    }
 
                     when (type) {
+                        "status" -> {
+                            val statusObj = data.getAsJsonObject("status")
+                            if (statusObj != null && statusObj.has("exec_info")) {
+                                val execInfo = statusObj.getAsJsonObject("exec_info")
+                                if (execInfo.has("queue_remaining")) {
+                                    val remaining = execInfo.get("queue_remaining").asInt
+                                    val current = progressFlow.value
+                                    if (current.state == GenerationState.ConnectingComfy || current.state == GenerationState.GeneratingBase) {
+                                        if (remaining > 0) {
+                                            progressFlow.value = current.copy(
+                                                state = GenerationState.GeneratingBase,
+                                                statusText = "Queued ($remaining remaining)..."
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         "executing" -> {
                             val node = data.get("node")?.let { if (it.isJsonNull) null else it.asString }
                             if (node == null) {
@@ -603,7 +648,7 @@ object ComfyClient {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                t.printStackTrace()
+                android.util.Log.e("ComfyClient", "WebSocket connection failed: ${t.localizedMessage}", t)
                 // Only show connection error if we aren't already completed/cancelled
                 if (progressFlow.value.state != GenerationState.Completed && 
                     progressFlow.value.state != GenerationState.Cancelled) {
@@ -664,200 +709,6 @@ object ComfyClient {
         return Pair(finalW, finalH)
     }
 
-    /**
-     * Converts a ComfyUI UI-format workflow (has "nodes" + "links" arrays) into
-     * the API-format (flat map of nodeId -> {class_type, inputs}) expected by /prompt.
-     *
-     * In UI format:
-     *   - nodes[].inputs is a List of {name, link?, ...} for LINKED inputs
-     *   - widget-only inputs are NOT in nodes[].inputs; their values are in widgets_values
-     *   - links is a List of [linkId, srcNodeId, srcSlot, dstNodeId, dstSlot, type]
-     *
-     * In API format:
-     *   - Each linked input becomes [srcNodeId_string, srcSlot]
-     *   - Each widget input stores its value directly
-     *
-     * We use objectInfo (from /object_info) to know the ORDERED list of all inputs per node type,
-     * so we can correctly assign widgets_values to the right input names.
-     */
-    private fun convertUiFormatToApi(uiWorkflow: JsonObject, objectInfo: JsonObject): JsonObject {
-        val nodes = uiWorkflow.getAsJsonArray("nodes") ?: return uiWorkflow
-        val links = uiWorkflow.getAsJsonArray("links") ?: JsonArray()
-
-        // Build link lookup: linkId -> [srcNodeId_string, srcSlot]
-        val linkMap = mutableMapOf<Int, JsonArray>()
-        links.forEach { linkEl ->
-            val link = linkEl.asJsonArray
-            if (link.size() >= 6) {
-                val linkId = link[0].asInt
-                val srcId = link[1].asString
-                val srcSlot = link[2].asInt
-                linkMap[linkId] = JsonArray().apply { add(srcId); add(srcSlot) }
-            }
-        }
-
-        // Identify Reroute nodes to bridge them
-        val rerouteMap = mutableMapOf<String, JsonArray?>()
-        nodes.forEach { nodeEl ->
-            val node = nodeEl.asJsonObject
-            val nodeType = node.get("type")?.asString ?: ""
-            if (nodeType == "Reroute" || nodeType.contains("Reroute")) {
-                val id = node.get("id").asString
-                val inputs = node.getAsJsonArray("inputs")
-                val inputLink = if (inputs != null && inputs.size() > 0) {
-                    val inp = inputs[0].asJsonObject
-                    if (inp.has("link") && !inp.get("link").isJsonNull) linkMap[inp.get("link").asInt] else null
-                } else null
-                rerouteMap[id] = inputLink
-            }
-        }
-
-        fun resolveSource(source: JsonArray): JsonArray {
-            var current = source
-            var depth = 0
-            while (depth < 20) {
-                val srcId = current[0].asString
-                if (rerouteMap.containsKey(srcId)) {
-                    val upStream = rerouteMap[srcId]
-                    if (upStream != null) {
-                        current = upStream
-                        depth++
-                        continue
-                    }
-                }
-                break
-            }
-            return current
-        }
-
-        // Dynamically determine connection types by looking at all node outputs
-        val connectionTypes = mutableSetOf<String>("*")
-        objectInfo.entrySet().forEach { entry ->
-            val nodeDef = entry.value.asJsonObject
-            val outputs = nodeDef.getAsJsonArray("output")
-            outputs?.forEach { outEl ->
-                if (outEl.isJsonPrimitive && outEl.asJsonPrimitive.isString) {
-                    connectionTypes.add(outEl.asString.uppercase())
-                }
-            }
-        }
-        // Remove primitive types that act as widgets
-        connectionTypes.removeAll(setOf("INT", "FLOAT", "STRING", "BOOLEAN", "COMBO", "NUMBER", "INTEGER", "DOUBLE"))
-
-        fun isConnType(typeEl: com.google.gson.JsonElement?): Boolean {
-            if (typeEl == null) return false
-            if (typeEl.isJsonPrimitive && typeEl.asJsonPrimitive.isString) {
-                return connectionTypes.contains(typeEl.asString.uppercase())
-            }
-            if (typeEl.isJsonArray) {
-                val arr = typeEl.asJsonArray
-                if (arr.size() > 0) {
-                    val first = arr[0]
-                    if (first.isJsonArray) return false // COMBO list
-                    if (first.isJsonPrimitive && first.asJsonPrimitive.isString) {
-                        return connectionTypes.contains(first.asString.uppercase())
-                    }
-                }
-            }
-            return false
-        }
-
-        val apiFormat = JsonObject()
-
-        nodes.forEach { nodeEl ->
-            val node = nodeEl.asJsonObject
-            val nodeId = node.get("id")?.asString ?: return@forEach
-            val nodeType = node.get("type")?.asString ?: return@forEach
-
-            // Skip display/routing nodes with no server implementation
-            if (nodeType == "Note" || nodeType == "Reroute" || nodeType.contains("Reroute")) return@forEach
-
-            val rawInputs = node.get("inputs")
-            val widgetsValues = node.getAsJsonArray("widgets_values")
-
-            val nodeInfo = objectInfo.getAsJsonObject(nodeType)
-            val inputSection = nodeInfo?.getAsJsonObject("input")
-            val requiredInputs = inputSection?.getAsJsonObject("required")
-            val optionalInputs = inputSection?.getAsJsonObject("optional")
-            val orderedInputNames = mutableListOf<String>().apply {
-                requiredInputs?.keySet()?.forEach { add(it) }
-                optionalInputs?.keySet()?.forEach { add(it) }
-            }
-
-            val linkedInputs = mutableMapOf<String, JsonArray>()
-            if (rawInputs?.isJsonArray == true) {
-                rawInputs.asJsonArray.forEach { inpEl ->
-                    if (!inpEl.isJsonObject) return@forEach
-                    val inp = inpEl.asJsonObject
-                    val name = inp.get("name")?.asString ?: return@forEach
-                    val linkId = if (inp.has("link") && !inp.get("link").isJsonNull)
-                        inp.get("link")?.asInt else null
-                    if (linkId != null && linkMap.containsKey(linkId)) {
-                        linkedInputs[name] = resolveSource(linkMap[linkId]!!)
-                    }
-                }
-            }
-
-            val apiInputs = JsonObject()
-            var widgetIdx = 0
-
-            if (orderedInputNames.isNotEmpty()) {
-                for (inputName in orderedInputNames) {
-                    val inputConfig = requiredInputs?.get(inputName) ?: optionalInputs?.get(inputName)
-                    val isConn = isConnType(inputConfig)
-
-                    if (isConn) {
-                        // Connection types are mapped from links only
-                        if (linkedInputs.containsKey(inputName)) {
-                            apiInputs.add(inputName, linkedInputs[inputName]!!.deepCopy())
-                        }
-                    } else {
-                        // Widget types are mapped from widgetsValues or links, but ALWAYS consume widgetsValues position
-                        if (linkedInputs.containsKey(inputName)) {
-                            apiInputs.add(inputName, linkedInputs[inputName]!!.deepCopy())
-                            if (widgetsValues != null && widgetIdx < widgetsValues.size()) widgetIdx++
-                        } else if (widgetsValues != null && widgetIdx < widgetsValues.size()) {
-                            apiInputs.add(inputName, widgetsValues[widgetIdx])
-                            widgetIdx++
-                        }
-
-                        // Handle frontend-only control_after_generate widget for seeds
-                        if ((inputName == "seed" || inputName == "noise_seed") && widgetsValues != null && widgetIdx < widgetsValues.size()) {
-                            val nextVal = widgetsValues[widgetIdx]
-                            if (nextVal.isJsonPrimitive && nextVal.asJsonPrimitive.isString) {
-                                val s = nextVal.asString
-                                if (s in setOf("fixed", "randomize", "increment", "decrement")) {
-                                    widgetIdx++
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Fallback for completely unknown nodes
-                if (rawInputs?.isJsonArray == true) {
-                    rawInputs.asJsonArray.forEach { inpEl ->
-                        if (!inpEl.isJsonObject) return@forEach
-                        val inp = inpEl.asJsonObject
-                        val name = inp.get("name")?.asString ?: return@forEach
-                        if (linkedInputs.containsKey(name)) {
-                            apiInputs.add(name, linkedInputs[name]!!.deepCopy())
-                            if (widgetsValues != null && widgetIdx < widgetsValues.size()) widgetIdx++
-                        } else if (widgetsValues != null && widgetIdx < widgetsValues.size()) {
-                            apiInputs.add(name, widgetsValues[widgetIdx])
-                            widgetIdx++
-                        }
-                    }
-                }
-            }
-
-            apiFormat.add(nodeId, JsonObject().apply {
-                addProperty("class_type", nodeType)
-                add("inputs", apiInputs)
-            })
-        }
-        return apiFormat
-    }
 
     suspend fun convertWorkflowToApi(uiJsonString: String, serverUrl: String): ConversionResult = withContext(Dispatchers.IO) {
         try {
@@ -890,5 +741,70 @@ object ComfyClient {
             e.printStackTrace()
             return@withContext ConversionResult.Error.Generic(e.localizedMessage ?: "Unknown error occurred")
         }
+    }
+
+    private fun isPositivePrompt(text: String): Boolean {
+        val lower = text.lowercase()
+        val negativeKeywords = listOf(
+            "bad", "blurry", "lowres", "worst", "quality", "deformed", "watermark", 
+            "logo", "text", "signature", "cropped", "ugly", "error", "mutilated", 
+            "disfigured", "extra limbs", "bad anatomy", "nsfw"
+        )
+        if (text.isBlank()) return true
+        for (kw in negativeKeywords) {
+            if (lower.contains(kw)) return false
+        }
+        return true
+    }
+
+    private fun overrideTextNode(
+        nodeId: String,
+        workflowObj: JsonObject,
+        prompt: String,
+        visited: MutableSet<String> = mutableSetOf()
+    ): Boolean {
+        if (nodeId in visited) return false
+        visited.add(nodeId)
+
+        val node = workflowObj.getAsJsonObject(nodeId) ?: return false
+        val inputs = node.getAsJsonObject("inputs") ?: return false
+
+        // 1. If this is a direct text/string node, override its value if it looks like a positive prompt
+        val textKeys = listOf("value", "string", "text", "Text")
+        for (key in textKeys) {
+            val valEl = inputs.get(key)
+            if (valEl != null && valEl.isJsonPrimitive && valEl.asJsonPrimitive.isString) {
+                val existing = valEl.asString
+                if (isPositivePrompt(existing)) {
+                    inputs.addProperty(key, prompt)
+                    android.util.Log.d("ComfyClient", "Recursively overrode direct string in node $nodeId key $key")
+                    return true
+                }
+            }
+        }
+
+        // 2. Otherwise, follow linked inputs recursively, avoiding negative/clip/model paths
+        var overrode = false
+        inputs.entrySet().forEach { entry ->
+            val key = entry.key
+            val valEl = entry.value
+            val lowerKey = key.lowercase()
+            if (valEl.isJsonArray && valEl.asJsonArray.size() >= 1) {
+                val shouldFollow = !lowerKey.contains("negative") && 
+                                   !lowerKey.contains("neg") && 
+                                   !lowerKey.contains("clip") && 
+                                   !lowerKey.contains("model") && 
+                                   !lowerKey.contains("vae") &&
+                                   !lowerKey.contains("image") &&
+                                   !lowerKey.contains("latent")
+                if (shouldFollow) {
+                    val originId = valEl.asJsonArray[0].asString
+                    if (overrideTextNode(originId, workflowObj, prompt, visited)) {
+                        overrode = true
+                    }
+                }
+            }
+        }
+        return overrode
     }
 }
