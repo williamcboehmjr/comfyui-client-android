@@ -2,12 +2,39 @@ package com.example.comfyprompt.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKeys
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
 class SettingsManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("comfy_prefs", Context.MODE_PRIVATE)
+    
+    private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+    private val encryptedPrefs: SharedPreferences = EncryptedSharedPreferences.create(
+        "comfy_secret_prefs",
+        masterKeyAlias,
+        context,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+    
     private val gson = Gson()
+
+    private fun getSensitiveKey(key: String, default: String = ""): String {
+        val encryptedValue = encryptedPrefs.getString(key, null)
+        if (encryptedValue != null) {
+            return encryptedValue
+        }
+        val normalValue = prefs.getString(key, null)
+        if (normalValue != null) {
+            // Migrate to encrypted
+            encryptedPrefs.edit().putString(key, normalValue).apply()
+            prefs.edit().remove(key).apply()
+            return normalValue
+        }
+        return default
+    }
 
     fun getSettings(): AppSettings {
         val aspectRatios = listOf(
@@ -36,15 +63,22 @@ class SettingsManager(context: Context) {
             ar = "16:9 (Panorama)"
         }
 
+        val hostTypeStr = prefs.getString("host_type", HostType.LOCAL.name) ?: HostType.LOCAL.name
+        val hostType = try {
+            HostType.valueOf(hostTypeStr)
+        } catch (e: Exception) {
+            HostType.LOCAL
+        }
+
         return AppSettings(
             serverUrl = prefs.getString("server_url", "http://10.0.2.2:8188") ?: "http://10.0.2.2:8188",
-            geminiApiKey = prefs.getString("gemini_key", "") ?: "",
+            geminiApiKey = getSensitiveKey("gemini_key", ""),
             geminiModel = prefs.getString("gemini_model", "gemini-1.5-flash") ?: "gemini-1.5-flash",
-            chatgptApiKey = prefs.getString("chatgpt_key", "") ?: "",
+            chatgptApiKey = getSensitiveKey("chatgpt_key", ""),
             chatgptModel = prefs.getString("chatgpt_model", "gpt-4o-mini") ?: "gpt-4o-mini",
-            claudeApiKey = prefs.getString("claude_key", "") ?: "",
+            claudeApiKey = getSensitiveKey("claude_key", ""),
             claudeModel = prefs.getString("claude_model", "claude-3-5-sonnet-latest") ?: "claude-3-5-sonnet-latest",
-            grokApiKey = prefs.getString("grok_key", "") ?: "",
+            grokApiKey = getSensitiveKey("grok_key", ""),
             grokModel = prefs.getString("grok_model", "grok-2-1212") ?: "grok-2-1212",
             apiProvider = prefs.getString("api_provider", "Gemini") ?: "Gemini",
             outputFormat = prefs.getString("output_format", "PNG") ?: "PNG",
@@ -59,20 +93,37 @@ class SettingsManager(context: Context) {
             megapixel = mp,
             aspectRatio = ar,
             enableEnhancer = prefs.getBoolean("enable_enhancer", true),
-            workflowToUse = prefs.getString("workflow_to_use", "") ?: ""
+            workflowToUse = prefs.getString("workflow_to_use", "") ?: "",
+            hostType = hostType,
+            localIpAddress = prefs.getString("local_ip_address", "http://10.0.2.2:8188") ?: "http://10.0.2.2:8188",
+            comfyDeployApiKey = getSensitiveKey("comfy_deploy_api_key", ""),
+            comfyDeployId = prefs.getString("comfy_deploy_id", "") ?: "",
+            runpodApiKey = getSensitiveKey("runpod_api_key", ""),
+            runpodEndpointId = prefs.getString("runpod_endpoint_id", "") ?: "",
+            falAiApiKey = getSensitiveKey("fal_ai_api_key", ""),
+            falAiEndpointSlug = prefs.getString("fal_ai_endpoint_slug", "") ?: ""
         )
     }
 
     fun saveSettings(settings: AppSettings) {
+        // Save sensitive keys in EncryptedSharedPreferences
+        encryptedPrefs.edit().apply {
+            putString("gemini_key", settings.geminiApiKey)
+            putString("chatgpt_key", settings.chatgptApiKey)
+            putString("claude_key", settings.claudeApiKey)
+            putString("grok_key", settings.grokApiKey)
+            putString("comfy_deploy_api_key", settings.comfyDeployApiKey)
+            putString("runpod_api_key", settings.runpodApiKey)
+            putString("fal_ai_api_key", settings.falAiApiKey)
+            apply()
+        }
+
+        // Save non-sensitive keys in standard SharedPreferences
         prefs.edit().apply {
             putString("server_url", settings.serverUrl)
-            putString("gemini_key", settings.geminiApiKey)
             putString("gemini_model", settings.geminiModel)
-            putString("chatgpt_key", settings.chatgptApiKey)
             putString("chatgpt_model", settings.chatgptModel)
-            putString("claude_key", settings.claudeApiKey)
             putString("claude_model", settings.claudeModel)
-            putString("grok_key", settings.grokApiKey)
             putString("grok_model", settings.grokModel)
             putString("api_provider", settings.apiProvider)
             putString("output_format", settings.outputFormat)
@@ -84,9 +135,24 @@ class SettingsManager(context: Context) {
             putString("aspect_ratio", settings.aspectRatio)
             putBoolean("enable_enhancer", settings.enableEnhancer)
             putString("workflow_to_use", settings.workflowToUse)
+            
+            // New settings
+            putString("host_type", settings.hostType.name)
+            putString("local_ip_address", settings.localIpAddress)
+            putString("comfy_deploy_id", settings.comfyDeployId)
+            putString("runpod_endpoint_id", settings.runpodEndpointId)
+            putString("fal_ai_endpoint_slug", settings.falAiEndpointSlug)
+
+            // Remove legacy plain-text sensitive keys from regular preferences if present
+            remove("gemini_key")
+            remove("chatgpt_key")
+            remove("claude_key")
+            remove("grok_key")
+            
             apply()
         }
     }
+
 
     fun getLastPrompt(): String {
         return prefs.getString("last_prompt", "") ?: ""

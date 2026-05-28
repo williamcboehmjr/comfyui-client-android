@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -21,23 +22,24 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 object ComfyClient {
-    private val client = OkHttpClient.Builder()
+    internal val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.MINUTES) // Long timeout for large upscales
         .writeTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    private val gson = Gson()
-    private val mediaType = "application/json; charset=utf-8".toMediaType()
+    internal val gson = Gson()
+    internal val mediaType = "application/json; charset=utf-8".toMediaType()
 
-    private var activeWebSocket: WebSocket? = null
-    private val clientId = UUID.randomUUID().toString()
-    private var currentPromptId: String? = null
+    internal var activeWebSocket: WebSocket? = null
+    internal val clientId = UUID.randomUUID().toString()
+    internal var currentPromptId: String? = null
     private var activeSeed: Long = 42L
-    private var activeSaveImageNodeId: String = "760"
+    internal var activeSaveImageNodeId: String = "760"
 
     val progressFlow = MutableStateFlow(ProgressInfo())
-    private val clientScope = CoroutineScope(Dispatchers.IO)
+    internal val clientScope = CoroutineScope(Dispatchers.IO)
+    internal var activeGenerationJob: kotlinx.coroutines.Job? = null
 
     private fun loadWorkflowFromAsset(context: Context): String {
         return context.assets.open("ernie_workflow.json").use { inputStream ->
@@ -78,7 +80,8 @@ object ComfyClient {
         settings: AppSettings,
         onSeedGenerated: (Long) -> Unit
     ) {
-        clientScope.launch {
+        activeGenerationJob?.cancel()
+        activeGenerationJob = clientScope.launch {
             try {
                 // Initialize state
                 progressFlow.value = ProgressInfo(
@@ -397,44 +400,34 @@ object ComfyClient {
                     android.util.Log.d("ComfyClient", "Removed FluxResolutionNode id=$id")
                 }
 
-                // 3. Connect to WebSocket first to ensure we receive early execution events
-                connectWebSocket(settings.serverUrl)
+                // 3. Serialise final workflow and execute chosen strategy!
+                val promptJson = gson.toJson(workflowObj)
 
-                // 4. Submit prompt request
-                val serverBaseUrl = settings.serverUrl.removeSuffix("/")
-                val promptUrl = "$serverBaseUrl/prompt"
-
-                val promptRequestBody = JsonObject().apply {
-                    add("prompt", workflowObj)
-                    addProperty("client_id", clientId)
+                val strategy = when (settings.hostType) {
+                    com.example.comfyprompt.data.HostType.LOCAL -> LocalStrategy
+                    com.example.comfyprompt.data.HostType.COMFY_DEPLOY -> ComfyDeployStrategy
+                    com.example.comfyprompt.data.HostType.RUNPOD -> RunPodStrategy
+                    com.example.comfyprompt.data.HostType.FAL_AI -> FalAiStrategy
                 }
 
-                val jsonBody = gson.toJson(promptRequestBody)
-                android.util.Log.d("ComfyClient", "Sending prompt: $jsonBody")
+                val result = strategy.generateImage(promptJson, settings)
 
-                val request = Request.Builder()
-                    .url(promptUrl)
-                    .post(jsonBody.toRequestBody(mediaType))
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    val responseBody = response.body?.string() ?: ""
-                    if (!response.isSuccessful) {
-                        progressFlow.value = ProgressInfo(
-                            state = GenerationState.Failed,
-                            statusText = "Server rejected request: ${response.code}\n$responseBody"
-                        )
-                        android.util.Log.e("ComfyClient", "Server error ${response.code}: $responseBody")
-                        return@launch
+                when (result) {
+                    is GenerationResult.Success -> {
+                        // For non-local, set completed and image path in UI. LocalStrategy handles this inside websocket updates.
+                        if (settings.hostType != com.example.comfyprompt.data.HostType.LOCAL) {
+                            progressFlow.value = progressFlow.value.copy(
+                                state = GenerationState.Completed,
+                                percent = 1f,
+                                finalImage = result.imageUrl,
+                                statusText = "Completed successfully."
+                            )
+                        }
                     }
-
-                    val responseObj = gson.fromJson(responseBody, JsonObject::class.java)
-                    currentPromptId = responseObj.get("prompt_id")?.asString
-
-                    if (currentPromptId == null) {
-                        progressFlow.value = ProgressInfo(
+                    is GenerationResult.Failure -> {
+                        progressFlow.value = progressFlow.value.copy(
                             state = GenerationState.Failed,
-                            statusText = "Server failed to return prompt ID"
+                            statusText = result.errorMessage
                         )
                     }
                 }
@@ -448,16 +441,72 @@ object ComfyClient {
         }
     }
 
+    internal suspend fun executeLocalGeneration(promptJson: String, settings: AppSettings) = withContext(Dispatchers.IO) {
+        try {
+            connectWebSocket(settings.serverUrl)
+
+            val serverBaseUrl = settings.serverUrl.removeSuffix("/")
+            val promptUrl = "$serverBaseUrl/prompt"
+
+            val promptRequestBody = JsonObject().apply {
+                val workflowObj = gson.fromJson(promptJson, JsonObject::class.java)
+                add("prompt", workflowObj)
+                addProperty("client_id", clientId)
+            }
+
+            val jsonBody = gson.toJson(promptRequestBody)
+            android.util.Log.d("ComfyClient", "Sending prompt: $jsonBody")
+
+            val request = Request.Builder()
+                .url(promptUrl)
+                .post(jsonBody.toRequestBody(mediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val responseBody = response.body?.string() ?: ""
+                if (!response.isSuccessful) {
+                    progressFlow.value = ProgressInfo(
+                        state = GenerationState.Failed,
+                        statusText = "Server rejected request: ${response.code}\n$responseBody"
+                    )
+                    android.util.Log.e("ComfyClient", "Server error ${response.code}: $responseBody")
+                    return@withContext
+                }
+
+                val responseObj = gson.fromJson(responseBody, JsonObject::class.java)
+                currentPromptId = responseObj.get("prompt_id")?.asString
+
+                if (currentPromptId == null) {
+                    progressFlow.value = ProgressInfo(
+                        state = GenerationState.Failed,
+                        statusText = "Server failed to return prompt ID"
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            progressFlow.value = ProgressInfo(
+                state = GenerationState.Failed,
+                statusText = "Connection error: ${e.localizedMessage}"
+            )
+        }
+    }
+
     fun stopGeneration(settings: AppSettings) {
+        activeGenerationJob?.cancel()
+        activeGenerationJob = null
+
         clientScope.launch {
             try {
-                val serverBaseUrl = settings.serverUrl.removeSuffix("/")
-                val interruptUrl = "$serverBaseUrl/interrupt"
-                val request = Request.Builder()
-                    .url(interruptUrl)
-                    .post("{}".toRequestBody(mediaType))
-                    .build()
-                client.newCall(request).execute().use { }
+                if (settings.hostType == com.example.comfyprompt.data.HostType.LOCAL) {
+                    val serverBaseUrl = settings.serverUrl.removeSuffix("/")
+                    val interruptUrl = "$serverBaseUrl/interrupt"
+                    val request = Request.Builder()
+                        .url(interruptUrl)
+                        .post("{}".toRequestBody(mediaType))
+                        .build()
+                    client.newCall(request).execute().use { }
+                }
 
                 progressFlow.value = progressFlow.value.copy(
                     state = GenerationState.Cancelled,
@@ -466,12 +515,14 @@ object ComfyClient {
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                disconnectWebSocket()
+                if (settings.hostType == com.example.comfyprompt.data.HostType.LOCAL) {
+                    disconnectWebSocket()
+                }
             }
         }
     }
 
-    private fun connectWebSocket(serverUrl: String) {
+    internal fun connectWebSocket(serverUrl: String) {
         disconnectWebSocket() // Ensure clean slate
 
         val cleanUrl = serverUrl.removeSuffix("/").replace("http://", "ws://").replace("https://", "wss://")
@@ -583,7 +634,7 @@ object ComfyClient {
         )
     }
 
-    private fun disconnectWebSocket() {
+    internal fun disconnectWebSocket() {
         try {
             activeWebSocket?.close(1000, "Clean closure")
         } catch (e: Exception) {

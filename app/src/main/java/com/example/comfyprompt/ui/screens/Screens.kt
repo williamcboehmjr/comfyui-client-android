@@ -51,6 +51,7 @@ import com.example.comfyprompt.data.GalleryItem
 import com.example.comfyprompt.data.GenerationState
 import com.example.comfyprompt.data.ProgressInfo
 import com.example.comfyprompt.data.SeedMode
+import com.example.comfyprompt.data.HostType
 import com.example.comfyprompt.theme.AccentGray
 import com.example.comfyprompt.theme.AccentRed
 import com.example.comfyprompt.theme.CardGray
@@ -1144,6 +1145,21 @@ fun SettingsScreen(
     var showApiKey by remember { mutableStateOf(false) }
     var workflowToUse by remember { mutableStateOf(settings.workflowToUse) }
 
+    // Host connection states
+    var selectedHostType by remember { mutableStateOf(settings.hostType) }
+    var localIpAddress by remember { mutableStateOf(settings.localIpAddress) }
+    var comfyDeployApiKey by remember { mutableStateOf(settings.comfyDeployApiKey) }
+    var comfyDeployId by remember { mutableStateOf(settings.comfyDeployId) }
+    var runpodApiKey by remember { mutableStateOf(settings.runpodApiKey) }
+    var runpodEndpointId by remember { mutableStateOf(settings.runpodEndpointId) }
+    var falAiApiKey by remember { mutableStateOf(settings.falAiApiKey) }
+    var falAiEndpointSlug by remember { mutableStateOf(settings.falAiEndpointSlug) }
+
+    var hostTypeDropdownExpanded by remember { mutableStateOf(false) }
+    var showComfyDeployApiKey by remember { mutableStateOf(false) }
+    var showRunpodApiKey by remember { mutableStateOf(false) }
+    var showFalAiApiKey by remember { mutableStateOf(false) }
+
     val providers = listOf("Gemini", "ChatGPT", "Claude", "Grok")
     val formats = listOf("PNG", "JPEG", "WEBP")
 
@@ -1197,31 +1213,284 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Server Settings Card
+            // Server Settings Card (Refactored to Host Connection Configuration Card)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = CardGray),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "COMFYUI SERVER ADDRESS",
+                        "HOST CONNECTION CONFIGURATION",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = AccentGray
                     )
-                    OutlinedTextField(
-                        value = serverUrl,
-                        onValueChange = { serverUrl = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.White,
-                            unfocusedBorderColor = AccentGray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    )
+
+                    // Host Type Selector
+                    Column {
+                        Text("Host Connection Type", style = MaterialTheme.typography.bodySmall, color = AccentGray)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(DarkGray)
+                                .border(1.dp, AccentGray, RoundedCornerShape(8.dp))
+                                .clickable { hostTypeDropdownExpanded = true }
+                                .padding(16.dp)
+                        ) {
+                            val hostTypeLabel = when (selectedHostType) {
+                                HostType.LOCAL -> "Local"
+                                HostType.COMFY_DEPLOY -> "ComfyDeploy"
+                                HostType.RUNPOD -> "RunPod Serverless"
+                                HostType.FAL_AI -> "Fal.ai"
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(hostTypeLabel, color = Color.White)
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = hostTypeDropdownExpanded,
+                                onDismissRequest = { hostTypeDropdownExpanded = false },
+                                modifier = Modifier.background(CardGray)
+                            ) {
+                                HostType.entries.forEach { type ->
+                                    val label = when (type) {
+                                        HostType.LOCAL -> "Local"
+                                        HostType.COMFY_DEPLOY -> "ComfyDeploy"
+                                        HostType.RUNPOD -> "RunPod Serverless"
+                                        HostType.FAL_AI -> "Fal.ai"
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text(label, color = Color.White) },
+                                        onClick = {
+                                            selectedHostType = type
+                                            hostTypeDropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Animated visibility layout for active HostType
+                    AnimatedVisibility(
+                        visible = selectedHostType == HostType.LOCAL,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut()
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                "Local Server Address",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AccentGray
+                            )
+                            OutlinedTextField(
+                                value = localIpAddress,
+                                onValueChange = { localIpAddress = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.White,
+                                    unfocusedBorderColor = AccentGray,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                placeholder = { Text("http://10.0.2.2:8188", color = AccentGray) }
+                            )
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = selectedHostType == HostType.COMFY_DEPLOY,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut()
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "ComfyDeploy API Key",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AccentGray
+                                )
+                                OutlinedTextField(
+                                    value = comfyDeployApiKey,
+                                    onValueChange = { comfyDeployApiKey = it },
+                                    visualTransformation = if (showComfyDeployApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White,
+                                        unfocusedBorderColor = AccentGray,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    trailingIcon = {
+                                        Text(
+                                            text = if (showComfyDeployApiKey) "HIDE" else "SHOW",
+                                            modifier = Modifier
+                                                .padding(end = 12.dp)
+                                                .clickable { showComfyDeployApiKey = !showComfyDeployApiKey },
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                )
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "ComfyDeploy Deployment ID",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AccentGray
+                                )
+                                OutlinedTextField(
+                                    value = comfyDeployId,
+                                    onValueChange = { comfyDeployId = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White,
+                                        unfocusedBorderColor = AccentGray,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = selectedHostType == HostType.RUNPOD,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut()
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "RunPod API Key",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AccentGray
+                                )
+                                OutlinedTextField(
+                                    value = runpodApiKey,
+                                    onValueChange = { runpodApiKey = it },
+                                    visualTransformation = if (showRunpodApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White,
+                                        unfocusedBorderColor = AccentGray,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    trailingIcon = {
+                                        Text(
+                                            text = if (showRunpodApiKey) "HIDE" else "SHOW",
+                                            modifier = Modifier
+                                                .padding(end = 12.dp)
+                                                .clickable { showRunpodApiKey = !showRunpodApiKey },
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                )
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "RunPod Endpoint ID",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AccentGray
+                                )
+                                OutlinedTextField(
+                                    value = runpodEndpointId,
+                                    onValueChange = { runpodEndpointId = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White,
+                                        unfocusedBorderColor = AccentGray,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = selectedHostType == HostType.FAL_AI,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut()
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "Fal.ai API Key",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AccentGray
+                                )
+                                OutlinedTextField(
+                                    value = falAiApiKey,
+                                    onValueChange = { falAiApiKey = it },
+                                    visualTransformation = if (showFalAiApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White,
+                                        unfocusedBorderColor = AccentGray,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    trailingIcon = {
+                                        Text(
+                                            text = if (showFalAiApiKey) "HIDE" else "SHOW",
+                                            modifier = Modifier
+                                                .padding(end = 12.dp)
+                                                .clickable { showFalAiApiKey = !showFalAiApiKey },
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                )
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "Fal.ai Endpoint Slug",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AccentGray
+                                )
+                                OutlinedTextField(
+                                    value = falAiEndpointSlug,
+                                    onValueChange = { falAiEndpointSlug = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White,
+                                        unfocusedBorderColor = AccentGray,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1551,7 +1820,15 @@ fun SettingsScreen(
             Button(
                 onClick = {
                     val updatedSettings = settings.copy(
-                        serverUrl = serverUrl,
+                        serverUrl = if (selectedHostType == HostType.LOCAL) localIpAddress else serverUrl,
+                        hostType = selectedHostType,
+                        localIpAddress = localIpAddress,
+                        comfyDeployApiKey = comfyDeployApiKey,
+                        comfyDeployId = comfyDeployId,
+                        runpodApiKey = runpodApiKey,
+                        runpodEndpointId = runpodEndpointId,
+                        falAiApiKey = falAiApiKey,
+                        falAiEndpointSlug = falAiEndpointSlug,
                         geminiApiKey = geminiKey,
                         geminiModel = geminiModel,
                         chatgptApiKey = chatgptKey,

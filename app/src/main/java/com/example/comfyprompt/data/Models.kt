@@ -4,6 +4,10 @@ enum class SeedMode {
     Random, Fixed, LastUsed, Custom
 }
 
+enum class HostType {
+    LOCAL, COMFY_DEPLOY, RUNPOD, FAL_AI
+}
+
 enum class GenerationState {
     Idle, 
     EnhancingPrompt, 
@@ -35,7 +39,15 @@ data class AppSettings(
     val megapixel: String = "1.0",
     val aspectRatio: String = "16:9 (Panorama)",
     val enableEnhancer: Boolean = true,
-    val workflowToUse: String = ""
+    val workflowToUse: String = "",
+    val hostType: HostType = HostType.LOCAL,
+    val localIpAddress: String = "http://10.0.2.2:8188",
+    val comfyDeployApiKey: String = "",
+    val comfyDeployId: String = "",
+    val runpodApiKey: String = "",
+    val runpodEndpointId: String = "",
+    val falAiApiKey: String = "",
+    val falAiEndpointSlug: String = ""
 )
 
 data class ProgressInfo(
