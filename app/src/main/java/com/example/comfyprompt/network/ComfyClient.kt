@@ -2,6 +2,7 @@ package com.example.comfyprompt.network
 
 import android.content.Context
 import com.example.comfyprompt.data.AppSettings
+import com.example.comfyprompt.data.ConversionResult
 import com.example.comfyprompt.data.GenerationState
 import com.example.comfyprompt.data.ProgressInfo
 import com.example.comfyprompt.data.SeedMode
@@ -103,7 +104,10 @@ object ComfyClient {
                 onSeedGenerated(activeSeed)
 
                 // 2. Load workflow JSON — fetch from server if a custom one is selected, else use bundled asset
-                val workflowJsonString = if (settings.workflowToUse.isNotBlank()) {
+                val workflowJsonString = if (settings.workflowToUse == "imported_workflow.json") {
+                    android.util.Log.d("ComfyClient", "Loading imported workflow locally from files storage")
+                    context.openFileInput("imported_workflow.json").bufferedReader().use { it.readText() }
+                } else if (settings.workflowToUse.isNotBlank()) {
                     val cleanUrl = settings.serverUrl.removeSuffix("/")
                     // ComfyUI's /userdata/{path} endpoint requires the slash in the subpath to be encoded as %2F
                     val encodedPath = java.net.URLEncoder.encode("workflows/${settings.workflowToUse}", "UTF-8").replace("+", "%20")
@@ -862,5 +866,38 @@ object ComfyClient {
             })
         }
         return apiFormat
+    }
+
+    suspend fun convertWorkflowToApi(uiJsonString: String, serverUrl: String): ConversionResult = withContext(Dispatchers.IO) {
+        try {
+            val dedicatedClient = client.newBuilder()
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.SECONDS)
+                .writeTimeout(5, TimeUnit.SECONDS)
+                .build()
+
+            val cleanUrl = serverUrl.removeSuffix("/")
+            val url = "$cleanUrl/workflow/convert"
+            val requestBody = uiJsonString.toRequestBody("application/json; charset=utf-8".toMediaType())
+
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+            
+            dedicatedClient.newCall(request).execute().use { response ->
+                val responseBody = response.body?.string() ?: ""
+                if (response.code == 404) {
+                    return@withContext ConversionResult.Error.MissingExtension
+                }
+                if (!response.isSuccessful) {
+                    return@withContext ConversionResult.Error.Generic("Server error: ${response.code} ${response.message}\n$responseBody")
+                }
+                return@withContext ConversionResult.Success(responseBody)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext ConversionResult.Error.Generic(e.localizedMessage ?: "Unknown error occurred")
+        }
     }
 }

@@ -123,9 +123,13 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                     viewModel.refreshSavedWorkflows()
                 }
                 val savedWorkflows by viewModel.savedWorkflows.collectAsState()
+                val importState by viewModel.importState.collectAsState()
                 SettingsScreen(
                     settings = settings,
                     savedWorkflows = savedWorkflows,
+                    importState = importState,
+                    onImportWorkflowClick = { ctx, uri -> viewModel.importWorkflow(ctx, uri) },
+                    onClearImportState = { viewModel.clearImportState() },
                     onSaveClick = { updatedSettings ->
                         viewModel.updateSettings(updatedSettings)
                         Toast.makeText(context, "Settings Saved!", Toast.LENGTH_SHORT).show()

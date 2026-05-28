@@ -69,3 +69,51 @@ data class GalleryItem(
     val seed: Long,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+enum class FormatType {
+    UI_STANDARD,
+    API_READY;
+    
+    companion object {
+        fun detect(jsonString: String): FormatType {
+            val element = com.google.gson.JsonParser.parseString(jsonString)
+            if (element.isJsonArray) return UI_STANDARD
+            if (element.isJsonObject) {
+                val obj = element.asJsonObject
+                if (obj.has("nodes") && obj.has("links")) {
+                    return UI_STANDARD
+                }
+                // Check if keys are numeric and point to objects with class_type & inputs
+                var hasNumericKeys = false
+                var matchesApi = true
+                obj.keySet().forEach { key ->
+                    if (key.toIntOrNull() != null) {
+                        hasNumericKeys = true
+                        val node = obj.get(key)
+                        if (node.isJsonObject) {
+                            val nodeObj = node.asJsonObject
+                            if (!nodeObj.has("class_type") || !nodeObj.has("inputs")) {
+                                matchesApi = false
+                            }
+                        } else {
+                            matchesApi = false
+                        }
+                    }
+                }
+                if (hasNumericKeys && matchesApi) {
+                    return API_READY
+                }
+            }
+            throw IllegalArgumentException("Invalid or unsupported workflow JSON format")
+        }
+    }
+}
+
+sealed class ConversionResult {
+    data class Success(val apiJson: String) : ConversionResult()
+    sealed class Error : ConversionResult() {
+        object MissingExtension : Error()
+        data class Generic(val message: String) : Error()
+    }
+}
+

@@ -2,6 +2,7 @@ package com.example.comfyprompt.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -1127,10 +1128,26 @@ fun ResultScreen(
 fun SettingsScreen(
     settings: AppSettings,
     savedWorkflows: List<String>,
+    importState: com.example.comfyprompt.ui.ImportState,
+    onImportWorkflowClick: (android.content.Context, android.net.Uri) -> Unit,
+    onClearImportState: () -> Unit,
     onSaveClick: (AppSettings) -> Unit,
     onBackClick: () -> Unit,
     onDownloadWorkflowClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    var hasImportedLocalWorkflow by remember(importState) {
+        mutableStateOf(context.getFileStreamPath("imported_workflow.json").exists())
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            onImportWorkflowClick(context, uri)
+        }
+    }
+
     var serverUrl by remember { mutableStateOf(settings.serverUrl) }
     var geminiKey by remember { mutableStateOf(settings.geminiApiKey) }
     var geminiModel by remember { mutableStateOf(settings.geminiModel) }
@@ -1524,7 +1541,11 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (workflowToUse.isBlank()) "Built-in Ernie Workflow (Default)" else workflowToUse,
+                                    text = when (workflowToUse) {
+                                        "" -> "Built-in Ernie Workflow (Default)"
+                                        "imported_workflow.json" -> "Imported Local Workflow (imported_workflow.json)"
+                                        else -> workflowToUse
+                                    },
                                     color = Color.White,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -1550,6 +1571,15 @@ fun SettingsScreen(
                                     workflowDropdownExpanded = false
                                 }
                             )
+                            if (hasImportedLocalWorkflow) {
+                                DropdownMenuItem(
+                                    text = { Text("Imported Local Workflow (imported_workflow.json)", color = Color.White) },
+                                    onClick = {
+                                        workflowToUse = "imported_workflow.json"
+                                        workflowDropdownExpanded = false
+                                    }
+                                )
+                            }
                             savedWorkflows.forEach { wf ->
                                 DropdownMenuItem(
                                     text = { Text(wf, color = Color.White) },
@@ -1560,6 +1590,26 @@ fun SettingsScreen(
                                 )
                             }
                         }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    OutlinedButton(
+                        onClick = { launcher.launch("application/json") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        border = BorderStroke(1.dp, Color.White),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "IMPORT WORKFLOW.JSON",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
                     }
 
                     if (savedWorkflows.isEmpty()) {
@@ -1855,6 +1905,102 @@ fun SettingsScreen(
                 Text("SAVE SETTINGS", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 16.sp)
             }
         }
+    }
+
+    if (importState is com.example.comfyprompt.ui.ImportState.Loading) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = {}) {
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(CardGray),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                    Text(
+                        text = "Attempting server conversion...",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+
+    if (importState is com.example.comfyprompt.ui.ImportState.MissingExtension) {
+        AlertDialog(
+            onDismissRequest = onClearImportState,
+            title = {
+                Text(
+                    text = "Unsupported Workflow Format",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "To import standard UI workflows, please either:",
+                        color = LightGray,
+                        fontSize = 14.sp
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("•", color = Color.White)
+                        Text(
+                            text = "Install 'Workflow to API Converter Endpoint' via ComfyUI Manager.",
+                            color = LightGray,
+                            fontSize = 14.sp
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("•", color = Color.White)
+                        Text(
+                            text = "Enable 'Dev mode Options' in ComfyUI and click 'Save (API format)'.",
+                            color = LightGray,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onClearImportState) {
+                    Text("OK", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = CardGray
+        )
+    }
+
+    if (importState is com.example.comfyprompt.ui.ImportState.Error) {
+        AlertDialog(
+            onDismissRequest = onClearImportState,
+            title = {
+                Text(
+                    text = "Import Error",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            },
+            text = {
+                Text(
+                    text = importState.message,
+                    color = LightGray,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onClearImportState) {
+                    Text("OK", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = CardGray
+        )
     }
 }
 

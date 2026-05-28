@@ -18,6 +18,8 @@ import com.example.comfyprompt.data.GenerationState
 import com.example.comfyprompt.data.ProgressInfo
 import com.example.comfyprompt.data.SeedMode
 import com.example.comfyprompt.data.SettingsManager
+import com.example.comfyprompt.data.FormatType
+import com.example.comfyprompt.data.ConversionResult
 import com.example.comfyprompt.network.ComfyClient
 import com.example.comfyprompt.network.GeminiClient
 import kotlinx.coroutines.Dispatchers
@@ -34,11 +36,73 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+sealed class ImportState {
+    object Idle : ImportState()
+    object Loading : ImportState()
+    object MissingExtension : ImportState()
+    data class Error(val message: String) : ImportState()
+}
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsManager = SettingsManager(application)
     
     private val _settings = MutableStateFlow(settingsManager.getSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    private val _importState = MutableStateFlow<ImportState>(ImportState.Idle)
+    val importState: StateFlow<ImportState> = _importState.asStateFlow()
+
+    fun clearImportState() {
+        _importState.value = ImportState.Idle
+    }
+
+    fun importWorkflow(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _importState.value = ImportState.Loading
+            try {
+                val jsonString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    inputStream.bufferedReader().use { it.readText() }
+                } ?: throw Exception("Could not read file contents.")
+                
+                val format = FormatType.detect(jsonString)
+                if (format == FormatType.API_READY) {
+                    context.openFileOutput("imported_workflow.json", Context.MODE_PRIVATE).use { output ->
+                        output.write(jsonString.toByteArray())
+                    }
+                    val updatedSettings = _settings.value.copy(workflowToUse = "imported_workflow.json")
+                    updateSettings(updatedSettings)
+                    _importState.value = ImportState.Idle
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Workflow imported successfully!", Toast.LENGTH_SHORT).show()
+                    }
+                } else if (format == FormatType.UI_STANDARD) {
+                    val result = ComfyClient.convertWorkflowToApi(jsonString, _settings.value.serverUrl)
+                    when (result) {
+                        is ConversionResult.Success -> {
+                            context.openFileOutput("imported_workflow.json", Context.MODE_PRIVATE).use { output ->
+                                output.write(result.apiJson.toByteArray())
+                            }
+                            val updatedSettings = _settings.value.copy(workflowToUse = "imported_workflow.json")
+                            updateSettings(updatedSettings)
+                            _importState.value = ImportState.Idle
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Workflow converted and imported successfully!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        is ConversionResult.Error.MissingExtension -> {
+                            _importState.value = ImportState.MissingExtension
+                        }
+                        is ConversionResult.Error.Generic -> {
+                            _importState.value = ImportState.Error(result.message)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _importState.value = ImportState.Error(e.localizedMessage ?: "Unknown error occurred")
+            }
+        }
+    }
 
     private val _currentPrompt = MutableStateFlow(settingsManager.getLastPrompt())
     val currentPrompt: StateFlow<String> = _currentPrompt.asStateFlow()
