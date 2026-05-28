@@ -593,15 +593,6 @@ object ComfyClient {
                                     progressFlow.value = current.copy(
                                         finalImage = imageUrl
                                     )
-                                    
-                                    if (node == activeSaveImageNodeId) {
-                                        progressFlow.value = progressFlow.value.copy(
-                                            state = GenerationState.Completed,
-                                            percent = 1f,
-                                            statusText = "Completed successfully."
-                                        )
-                                        disconnectWebSocket()
-                                    }
                                 }
                             }
                         }
