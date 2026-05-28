@@ -51,8 +51,9 @@ This is a modern Android codebase built with the following industry-standard tec
 ## 🚀 Getting Started
 
 ### Prerequisites
-1. Ensure your ComfyUI server is running and accessible over your local network or via a public tunnel (e.g., ngrok).
-2. For testing on the Android Emulator, the default connection is configured to loop back to the emulator host at `http://10.0.2.2:8188`.
+1.  **Enable Dev Mode in ComfyUI**: You **must** enable Developer Mode in your ComfyUI web interface settings to allow proper API workflow handling. Open ComfyUI in your browser, click the settings gear icon, and check **"Enable Dev mode"**.
+2.  Ensure your ComfyUI server is running and accessible over your local network or via a public tunnel (e.g., ngrok).
+3.  For testing on the Android Emulator, the default connection is configured to loop back to the emulator host at `http://10.0.2.2:8188`.
 
 ### Building from Source
 You can compile and run the project using Android Studio or directly via the terminal:
