@@ -124,10 +124,13 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                 }
                 val savedWorkflows by viewModel.savedWorkflows.collectAsState()
                 val importState by viewModel.importState.collectAsState()
+                val localModels by viewModel.localModels.collectAsState()
                 SettingsScreen(
                     settings = settings,
                     savedWorkflows = savedWorkflows,
                     importState = importState,
+                    localModels = localModels,
+                    onFetchLocalModelsClick = { url -> viewModel.fetchLocalModels(url) },
                     onImportWorkflowClick = { ctx, uri -> viewModel.importWorkflow(ctx, uri) },
                     onClearImportState = { viewModel.clearImportState() },
                     onSaveClick = { updatedSettings ->

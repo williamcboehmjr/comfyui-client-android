@@ -47,7 +47,9 @@ data class AppSettings(
     val runpodApiKey: String = "",
     val runpodEndpointId: String = "",
     val falAiApiKey: String = "",
-    val falAiEndpointSlug: String = ""
+    val falAiEndpointSlug: String = "",
+    val localLlmBaseUrl: String = "http://10.0.2.2:1234/v1",
+    val localLlmSelectedModel: String = ""
 )
 
 data class ProgressInfo(

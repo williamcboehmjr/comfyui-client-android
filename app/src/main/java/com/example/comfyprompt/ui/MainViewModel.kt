@@ -113,6 +113,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _savedWorkflows = MutableStateFlow<List<String>>(emptyList())
     val savedWorkflows: StateFlow<List<String>> = _savedWorkflows.asStateFlow()
 
+    private val _localModels = MutableStateFlow<List<String>>(emptyList())
+    val localModels: StateFlow<List<String>> = _localModels.asStateFlow()
+
+    fun fetchLocalModels(baseUrl: String) {
+        viewModelScope.launch {
+            try {
+                val models = GeminiClient.fetchLocalModels(baseUrl)
+                _localModels.value = models
+                if (models.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "No models found or error fetching.", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "Fetched ${models.size} models", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Error fetching local models: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+                _localModels.value = emptyList()
+            }
+        }
+    }
+
     fun refreshSavedWorkflows() {
         ComfyClient.fetchSavedWorkflows(_settings.value.serverUrl) { list ->
             _savedWorkflows.value = list

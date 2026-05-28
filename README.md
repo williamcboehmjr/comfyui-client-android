@@ -32,7 +32,7 @@
 *   **Natively Calculated Resolution Injection**: Dynamically intercepts latent/image generators and injects native, aspect-ratio-friendly resolutions calculated directly on your device.
 
 ### 🖼️ Seamless Mobile UX
-*   **Prompt Enhancer Integration**: Features built-in AI adapters (supporting Gemini, ChatGPT, Claude, and Grok) to expand simple input prompts into beautiful visual styles.
+*   **Prompt Enhancer Integration**: Features built-in AI adapters (supporting Gemini, ChatGPT, Claude, Grok, and local/custom OpenAI-compatible endpoints) to expand simple input prompts into beautiful visual styles.
 *   **Dynamic Gallery & Viewer**: Stores generation history locally with high-performance caching. Tap any item to view in full-screen, or instantly invoke native Android Share and Download operations.
 *   **Settings Suite**: Easily configure host URL, megapixels, desired aspect ratios, and model specifications.
 
@@ -62,6 +62,15 @@ This is a modern Android codebase built with the following industry-standard tec
 2.  **Enable Dev Mode in ComfyUI** (Optional): If you prefer to manually import pre-converted API-format workflows directly, enable Developer Mode in your ComfyUI web interface settings: open the settings gear icon, and check **"Enable Dev mode"**. Then click **"Save (API format)"** to download the converted JSON.
 3.  Ensure your ComfyUI server is running and accessible over your local network or via a public tunnel (e.g., ngrok).
 4.  For testing on the Android Emulator, the default connection is configured to loop back to the emulator host at `http://10.0.2.2:8188`.
+
+### 🤖 Local / Custom Prompt Expander Setup
+You can use a local or custom OpenAI-compatible API provider (e.g., LM Studio, Ollama, Llama.cpp) to expand your prompts.
+1. Run your local LLM server on your host machine.
+2. In the app's **Settings**, set **Active AI Provider** to `Local / Custom`.
+3. Enter the **Local LLM Base URL**.
+   * When using the Android Emulator, connect to your host machine's local server using the gateway IP `10.0.2.2`. For example, LM Studio running on port 1234 would be `http://10.0.2.2:1234/v1`.
+4. Click **Fetch Models** to dynamically query the server's `/models` endpoint.
+5. Select your desired model from the dropdown.
 
 ### Building from Source
 You can compile and run the project using Android Studio or directly via the terminal:

@@ -1133,7 +1133,9 @@ fun SettingsScreen(
     onClearImportState: () -> Unit,
     onSaveClick: (AppSettings) -> Unit,
     onBackClick: () -> Unit,
-    onDownloadWorkflowClick: () -> Unit
+    onDownloadWorkflowClick: () -> Unit,
+    localModels: List<String> = emptyList(),
+    onFetchLocalModelsClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     var hasImportedLocalWorkflow by remember(importState) {
@@ -1157,6 +1159,8 @@ fun SettingsScreen(
     var claudeModel by remember { mutableStateOf(settings.claudeModel) }
     var grokKey by remember { mutableStateOf(settings.grokApiKey) }
     var grokModel by remember { mutableStateOf(settings.grokModel) }
+    var localLlmBaseUrl by remember { mutableStateOf(settings.localLlmBaseUrl) }
+    var localLlmSelectedModel by remember { mutableStateOf(settings.localLlmSelectedModel) }
     var apiProvider by remember { mutableStateOf(settings.apiProvider) }
     var outputFormat by remember { mutableStateOf(settings.outputFormat) }
     var showApiKey by remember { mutableStateOf(false) }
@@ -1177,7 +1181,7 @@ fun SettingsScreen(
     var showRunpodApiKey by remember { mutableStateOf(false) }
     var showFalAiApiKey by remember { mutableStateOf(false) }
 
-    val providers = listOf("Gemini", "ChatGPT", "Claude", "Grok")
+    val providers = listOf("Gemini", "ChatGPT", "Claude", "Grok", "Local / Custom")
     val formats = listOf("PNG", "JPEG", "WEBP")
 
     val geminiModels = listOf(
@@ -1709,64 +1713,97 @@ fun SettingsScreen(
 
                     HorizontalDivider(color = DarkGray, thickness = 1.dp)
 
-                    // Active API Key input field depending on the provider
-                    val currentKey: String
-                    val onKeyChange: (String) -> Unit
-                    val keyLabel: String
-                    when (apiProvider) {
-                        "ChatGPT" -> {
-                            currentKey = chatgptKey
-                            onKeyChange = { chatgptKey = it }
-                            keyLabel = "ChatGPT API Key (OpenAI)"
+                    if (apiProvider == "Local / Custom") {
+                        Column {
+                            Text("Local LLM Base URL", style = MaterialTheme.typography.bodySmall, color = AccentGray)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = localLlmBaseUrl,
+                                    onValueChange = { localLlmBaseUrl = it },
+                                    modifier = Modifier.weight(1f),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White,
+                                        unfocusedBorderColor = AccentGray,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                Button(
+                                    onClick = { onFetchLocalModelsClick(localLlmBaseUrl) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Fetch Models", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
                         }
-                        "Claude" -> {
-                            currentKey = claudeKey
-                            onKeyChange = { claudeKey = it }
-                            keyLabel = "Claude API Key (Anthropic)"
+                    } else {
+                        // Active API Key input field depending on the provider
+                        val currentKey: String
+                        val onKeyChange: (String) -> Unit
+                        val keyLabel: String
+                        when (apiProvider) {
+                            "ChatGPT" -> {
+                                currentKey = chatgptKey
+                                onKeyChange = { chatgptKey = it }
+                                keyLabel = "ChatGPT API Key (OpenAI)"
+                            }
+                            "Claude" -> {
+                                currentKey = claudeKey
+                                onKeyChange = { claudeKey = it }
+                                keyLabel = "Claude API Key (Anthropic)"
+                            }
+                            "Grok" -> {
+                                currentKey = grokKey
+                                onKeyChange = { grokKey = it }
+                                keyLabel = "Grok API Key (xAI)"
+                            }
+                            else -> {
+                                currentKey = geminiKey
+                                onKeyChange = { geminiKey = it }
+                                keyLabel = "Gemini API Key (Google AI Studio)"
+                            }
                         }
-                        "Grok" -> {
-                            currentKey = grokKey
-                            onKeyChange = { grokKey = it }
-                            keyLabel = "Grok API Key (xAI)"
-                        }
-                        else -> {
-                            currentKey = geminiKey
-                            onKeyChange = { geminiKey = it }
-                            keyLabel = "Gemini API Key (Google AI Studio)"
-                        }
+    
+                        OutlinedTextField(
+                            value = currentKey,
+                            onValueChange = onKeyChange,
+                            label = { Text(keyLabel, color = AccentGray) },
+                            visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.White,
+                                unfocusedBorderColor = AccentGray,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            trailingIcon = {
+                                Text(
+                                    text = if (showApiKey) "HIDE" else "SHOW",
+                                    modifier = Modifier
+                                        .padding(end = 12.dp)
+                                        .clickable { showApiKey = !showApiKey },
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        )
                     }
-
-                    OutlinedTextField(
-                        value = currentKey,
-                        onValueChange = onKeyChange,
-                        label = { Text(keyLabel, color = AccentGray) },
-                        visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.White,
-                            unfocusedBorderColor = AccentGray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        trailingIcon = {
-                            Text(
-                                text = if (showApiKey) "HIDE" else "SHOW",
-                                modifier = Modifier
-                                    .padding(end = 12.dp)
-                                    .clickable { showApiKey = !showApiKey },
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                    )
 
                     // Active Model Dropdown depending on the provider
                     val currentModel: String
                     val onModelChange: (String) -> Unit
                     val modelsList: List<String>
                     when (apiProvider) {
+                        "Local / Custom" -> {
+                            currentModel = localLlmSelectedModel
+                            onModelChange = { localLlmSelectedModel = it }
+                            modelsList = localModels
+                        }
                         "ChatGPT" -> {
                             currentModel = chatgptModel
                             onModelChange = { chatgptModel = it }
@@ -1887,6 +1924,8 @@ fun SettingsScreen(
                         claudeModel = claudeModel,
                         grokApiKey = grokKey,
                         grokModel = grokModel,
+                        localLlmBaseUrl = localLlmBaseUrl,
+                        localLlmSelectedModel = localLlmSelectedModel,
                         apiProvider = apiProvider,
                         outputFormat = outputFormat,
                         workflowToUse = workflowToUse

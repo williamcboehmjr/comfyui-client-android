@@ -101,7 +101,9 @@ class SettingsManager(context: Context) {
             runpodApiKey = getSensitiveKey("runpod_api_key", ""),
             runpodEndpointId = prefs.getString("runpod_endpoint_id", "") ?: "",
             falAiApiKey = getSensitiveKey("fal_ai_api_key", ""),
-            falAiEndpointSlug = prefs.getString("fal_ai_endpoint_slug", "") ?: ""
+            falAiEndpointSlug = prefs.getString("fal_ai_endpoint_slug", "") ?: "",
+            localLlmBaseUrl = prefs.getString("local_llm_base_url", "http://10.0.2.2:1234/v1") ?: "http://10.0.2.2:1234/v1",
+            localLlmSelectedModel = prefs.getString("local_llm_selected_model", "") ?: ""
         )
     }
 
@@ -142,6 +144,8 @@ class SettingsManager(context: Context) {
             putString("comfy_deploy_id", settings.comfyDeployId)
             putString("runpod_endpoint_id", settings.runpodEndpointId)
             putString("fal_ai_endpoint_slug", settings.falAiEndpointSlug)
+            putString("local_llm_base_url", settings.localLlmBaseUrl)
+            putString("local_llm_selected_model", settings.localLlmSelectedModel)
 
             // Remove legacy plain-text sensitive keys from regular preferences if present
             remove("gemini_key")

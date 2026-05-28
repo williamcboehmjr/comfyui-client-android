@@ -25,10 +25,11 @@ object GeminiClient {
             "ChatGPT" -> settings.chatgptApiKey
             "Claude" -> settings.claudeApiKey
             "Grok" -> settings.grokApiKey
+            "Local / Custom" -> "dummy"
             else -> settings.geminiApiKey
         }
 
-        if (apiKey.isBlank()) {
+        if (provider != "Local / Custom" && apiKey.isBlank()) {
             android.util.Log.d("GeminiClient", "$provider API key is blank. Bypassing enhancer.")
             return@withContext userPrompt // Fallback to raw prompt if no API key is set
         }
@@ -113,6 +114,44 @@ object GeminiClient {
                                 val enhancedText = message.get("content").asString.trim()
                                 if (enhancedText.isNotEmpty()) {
                                     android.util.Log.d("GeminiClient", "Grok enhanced prompt: $enhancedText")
+                                    return@withContext enhancedText
+                                }
+                            }
+                        }
+                        userPrompt
+                    }
+                }
+                "Local / Custom" -> {
+                    val url = "${settings.localLlmBaseUrl.removeSuffix("/")}/chat/completions"
+                    val jsonRequest = mapOf(
+                        "model" to settings.localLlmSelectedModel,
+                        "messages" to listOf(
+                            mapOf("role" to "system", "content" to systemInstruction),
+                            mapOf("role" to "user", "content" to userPrompt)
+                        )
+                    )
+                    val requestBody = gson.toJson(jsonRequest).toRequestBody(mediaType)
+                    val request = Request.Builder()
+                        .url(url)
+                        .post(requestBody)
+                        .addHeader("Authorization", "Bearer dummy")
+                        .addHeader("Content-Type", "application/json")
+                        .build()
+
+                    client.newCall(request).execute().use { response ->
+                        val bodyString = response.body?.string() ?: ""
+                        if (!response.isSuccessful) {
+                            android.util.Log.e("GeminiClient", "Local LLM API failed with code: ${response.code}, body: $bodyString")
+                            return@withContext userPrompt
+                        }
+                        val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
+                        val choices = jsonObject.getAsJsonArray("choices")
+                        if (choices != null && choices.size() > 0) {
+                            val message = choices[0].asJsonObject.getAsJsonObject("message")
+                            if (message != null) {
+                                val enhancedText = message.get("content").asString.trim()
+                                if (enhancedText.isNotEmpty()) {
+                                    android.util.Log.d("GeminiClient", "Local LLM enhanced prompt: $enhancedText")
                                     return@withContext enhancedText
                                 }
                             }
@@ -221,6 +260,41 @@ object GeminiClient {
         } catch (e: Exception) {
             android.util.Log.e("GeminiClient", "Exception during prompt enhancement", e)
             userPrompt
+        }
+    }
+
+    suspend fun fetchLocalModels(baseUrl: String): List<String> = withContext(Dispatchers.IO) {
+        if (baseUrl.isBlank()) return@withContext emptyList()
+        val url = "${baseUrl.removeSuffix("/")}/models"
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .addHeader("Authorization", "Bearer dummy")
+            .build()
+            
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    android.util.Log.e("GeminiClient", "fetchLocalModels failed: HTTP ${response.code}")
+                    return@withContext emptyList()
+                }
+                val bodyString = response.body?.string() ?: return@withContext emptyList()
+                val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
+                val dataArray = jsonObject.getAsJsonArray("data") ?: return@withContext emptyList()
+                
+                val models = mutableListOf<String>()
+                for (element in dataArray) {
+                    val modelObj = element.asJsonObject
+                    val id = modelObj.get("id")?.asString
+                    if (!id.isNullOrBlank()) {
+                        models.add(id)
+                    }
+                }
+                models
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GeminiClient", "Exception during fetchLocalModels", e)
+            emptyList()
         }
     }
 }
