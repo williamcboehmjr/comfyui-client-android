@@ -54,11 +54,16 @@ This is a modern Android codebase built with the following industry-standard tec
 
 ### Prerequisites
 1.  **Install the API Converter Extension**:
-    To run raw custom workflows in "UI-format", your ComfyUI server must have the [Workflow to API Converter Endpoint](https://github.com/SethRobinson/comfyui-api-endpoint) extension installed:
-    *   Open ComfyUI, open **ComfyUI Manager**, and search for `"Workflow to API Converter Endpoint"`.
-    *   Click **Install** and restart your ComfyUI server.
-    *   *Note*: The API converter automatically respects **Muted** (`mode: 2`) and **Bypassed** (`mode: 4`) nodes, skipping or bridging them cleanly. Keep this in mind when designing your graphs.
-    *   *Note*: This extension is **not** required if you import workflows pre-saved in API-format (via Developer Mode in ComfyUI Web UI) or use the built-in workflow.
+    To run raw custom workflows in "UI-format", your ComfyUI server must have the [Workflow to API Converter Endpoint](https://github.com/SethRobinson/comfyui-api-endpoint) extension installed.
+    *   **How it Works**: 
+        - This extension exposes a custom API endpoint (`POST /workflow/convert`) directly on your ComfyUI host server.
+        - When the Android app imports a raw, full-fledged ComfyUI UI-format JSON (nodes + links), it POSTs this graph to `/workflow/convert`.
+        - The backend extension processes the graph using ComfyUI's native internal execution engine to resolve all connections, inputs, and widgets, translating it into the strict, clean "API-format" execution payload (`prompt` JSON) expected by the ComfyUI server queue.
+        - During conversion, the engine automatically respects and bridges **Muted** (`mode: 2`) and **Bypassed** (`mode: 4`) nodes, ensuring your workflow behaves exactly on mobile as it does in your browser.
+    *   **Installation**:
+        - Open ComfyUI, open the **ComfyUI Manager**, and search for `"Workflow to API Converter Endpoint"`.
+        - Click **Install** and restart your ComfyUI server.
+    *   *Note*: This extension is **not** required if you import workflows pre-saved in API-format (via Developer Mode in ComfyUI Web UI) or use the application's built-in default workflow.
 2.  **Enable Dev Mode in ComfyUI** (Optional): If you prefer to manually import pre-converted API-format workflows directly, enable Developer Mode in your ComfyUI web interface settings: open the settings gear icon, and check **"Enable Dev mode"**. Then click **"Save (API format)"** to download the converted JSON.
 3.  Ensure your ComfyUI server is running and accessible over your local network or via a public tunnel (e.g., ngrok).
 4.  For testing on the Android Emulator, the default connection is configured to loop back to the emulator host at `http://10.0.2.2:8188`.
