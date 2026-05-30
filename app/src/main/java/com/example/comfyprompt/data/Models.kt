@@ -119,3 +119,11 @@ sealed class ConversionResult {
     }
 }
 
+data class QueueJob(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val prompt: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val progress: ProgressInfo = ProgressInfo(),
+    val settings: AppSettings
+)
+

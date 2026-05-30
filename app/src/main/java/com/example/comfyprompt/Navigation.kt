@@ -5,6 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
@@ -20,6 +24,7 @@ import com.example.comfyprompt.ui.screens.SettingsScreen
 import com.example.comfyprompt.ui.screens.GalleryScreen
 import com.example.comfyprompt.ui.screens.LogsScreen
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun MainNavigation(viewModel: MainViewModel = viewModel()) {
     val backStack = rememberNavBackStack(Prompt as NavKey)
@@ -30,8 +35,14 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
     val prompt by viewModel.currentPrompt.collectAsState()
     val cooldownSeconds by viewModel.generateCooldownSeconds.collectAsState()
 
+    val queueJobs by viewModel.queueList.collectAsState()
+    val activeJobId by viewModel.activeJobId.collectAsState()
+    var showBottomSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+
     // Monitor active generation flow to auto-navigate
     LaunchedEffect(progressInfo.state) {
+        val currentScreen = backStack.lastOrNull()
         when (progressInfo.state) {
             GenerationState.Completed -> {
                 val finalImage = progressInfo.finalImage
@@ -41,133 +52,178 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                         com.example.comfyprompt.data.SeedMode.Custom -> settings.customSeedValue
                         else -> settings.lastUsedSeedValue
                     }
-                    // Only add if not already there to avoid duplicates
-                    if (backStack.lastOrNull() !is Result) {
+                    // Only auto-navigate to Result if the user was actively watching the Progress screen
+                    if (currentScreen is Progress && backStack.lastOrNull() !is Result) {
+                        backStack.removeLastOrNull() // Remove Progress screen
                         backStack.add(Result(finalImage, seed))
                     }
                 }
             }
             GenerationState.Failed -> {
-                Toast.makeText(context, progressInfo.statusText, Toast.LENGTH_LONG).show()
-                backStack.removeLastOrNull() // Go back from Progress
-                viewModel.resetState()
+                if (currentScreen is Progress) {
+                    Toast.makeText(context, progressInfo.statusText, Toast.LENGTH_LONG).show()
+                    backStack.removeLastOrNull() // Go back from Progress
+                    viewModel.resetState()
+                }
             }
             GenerationState.Cancelled -> {
-                backStack.removeLastOrNull() // Go back from Progress
-                viewModel.resetState()
+                if (currentScreen is Progress) {
+                    backStack.removeLastOrNull() // Go back from Progress
+                    viewModel.resetState()
+                }
             }
             else -> {}
         }
     }
 
-    NavDisplay(
-        backStack = backStack,
-        onBack = { if (backStack.size > 1) backStack.removeLastOrNull() },
-        entryProvider = entryProvider {
-            entry<Prompt> {
-                PromptScreen(
-                    prompt = prompt,
-                    onPromptChange = { viewModel.updatePrompt(it) },
-                    settings = settings,
-                    onGenerateClick = { promptText ->
-                        viewModel.generateImage(promptText)
-                        backStack.add(Progress)
-                    },
-                    onSettingsClick = { backStack.add(Settings) },
-                    onGalleryClick = { backStack.add(Gallery) },
-                    onEnhancerToggle = { isEnabled ->
-                        val updated = settings.copy(enableEnhancer = isEnabled)
-                        viewModel.updateSettings(updated)
-                    },
-                    onSeedModeChange = { mode, customVal ->
-                        val updated = settings.copy(
-                            seedMode = mode,
-                            customSeedValue = customVal
-                        )
-                        viewModel.updateSettings(updated)
-                    },
-                    onMegapixelChange = { mp ->
-                        val updated = settings.copy(megapixel = mp)
-                        viewModel.updateSettings(updated)
-                    },
-                    onAspectRatioChange = { ar ->
-                        val updated = settings.copy(aspectRatio = ar)
-                        viewModel.updateSettings(updated)
-                    },
-                    cooldownSeconds = cooldownSeconds
-                )
-            }
-            entry<Progress> {
-                ProgressScreen(
-                    progressInfo = progressInfo,
-                    prompt = prompt,
-                    onStopClick = { viewModel.stopGeneration() },
-                    onSaveClick = { imageUrl -> viewModel.saveImageToDownloads(imageUrl, settings.outputFormat) },
-                    onShareClick = { imageUrl -> viewModel.shareImage(imageUrl) }
-                )
-            }
-            entry<Result> { key ->
-                ResultScreen(
-                    finalImageUrl = key.imageUrl,
-                    seed = key.seed,
-                    onSaveClick = { viewModel.saveImageToDownloads(key.imageUrl, settings.outputFormat) },
-                    onShareClick = { viewModel.shareImage(key.imageUrl) },
-                    onReRunClick = {
-                        viewModel.resetState()
-                        // Clear up to Prompt
-                        while (backStack.size > 1) {
-                            backStack.removeLastOrNull()
-                        }
-                    }
-                )
-            }
-            entry<Settings> {
-                androidx.compose.runtime.LaunchedEffect(Unit) {
-                    viewModel.refreshSavedWorkflows()
+    androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+        NavDisplay(
+            backStack = backStack,
+            onBack = { if (backStack.size > 1) backStack.removeLastOrNull() },
+            entryProvider = entryProvider {
+                entry<Prompt> {
+                    PromptScreen(
+                        prompt = prompt,
+                        onPromptChange = { viewModel.updatePrompt(it) },
+                        settings = settings,
+                        onGenerateClick = { promptText ->
+                            viewModel.generateImage(promptText)
+                            Toast.makeText(context, "Prompt added to queue", Toast.LENGTH_SHORT).show()
+                        },
+                        onSettingsClick = { backStack.add(Settings) },
+                        onGalleryClick = { backStack.add(Gallery) },
+                        onEnhancerToggle = { isEnabled ->
+                            val updated = settings.copy(enableEnhancer = isEnabled)
+                            viewModel.updateSettings(updated)
+                        },
+                        onSeedModeChange = { mode, customVal ->
+                            val updated = settings.copy(
+                                seedMode = mode,
+                                customSeedValue = customVal
+                            )
+                            viewModel.updateSettings(updated)
+                        },
+                        onMegapixelChange = { mp ->
+                            val updated = settings.copy(megapixel = mp)
+                            viewModel.updateSettings(updated)
+                        },
+                        onAspectRatioChange = { ar ->
+                            val updated = settings.copy(aspectRatio = ar)
+                            viewModel.updateSettings(updated)
+                        },
+                        cooldownSeconds = cooldownSeconds
+                    )
                 }
-                val savedWorkflows by viewModel.savedWorkflows.collectAsState()
-                val importState by viewModel.importState.collectAsState()
-                val localModels by viewModel.localModels.collectAsState()
-                SettingsScreen(
-                    settings = settings,
-                    savedWorkflows = savedWorkflows,
-                    importState = importState,
-                    localModels = localModels,
-                    onFetchLocalModelsClick = { url -> viewModel.fetchLocalModels(url) },
-                    onImportWorkflowClick = { ctx, uri -> viewModel.importWorkflow(ctx, uri) },
-                    onClearImportState = { viewModel.clearImportState() },
-                    onSaveClick = { updatedSettings ->
-                        viewModel.updateSettings(updatedSettings)
-                        Toast.makeText(context, "Settings Saved!", Toast.LENGTH_SHORT).show()
-                        backStack.removeLastOrNull()
-                    },
-                    onBackClick = { backStack.removeLastOrNull() },
-                    onDownloadWorkflowClick = { viewModel.downloadWorkflow() },
-                    onViewLogsClick = { backStack.add(Logs) }
-                )
-            }
-            entry<Logs> {
-                LogsScreen(
-                    onBackClick = { backStack.removeLastOrNull() }
-                )
-            }
-            entry<Gallery> {
-                val galleryItems by viewModel.galleryItems.collectAsState()
-                GalleryScreen(
-                    items = galleryItems,
-                    onBackClick = { backStack.removeLastOrNull() },
-                    onReRunClick = { promptText ->
-                        viewModel.updatePrompt(promptText)
-                        // Clear up to Prompt (Home)
-                        while (backStack.size > 1) {
+                entry<Progress> {
+                    val activeJobPrompt = queueJobs.firstOrNull { it.id == activeJobId }?.prompt
+                    ProgressScreen(
+                        progressInfo = progressInfo,
+                        prompt = activeJobPrompt ?: prompt,
+                        onStopClick = { viewModel.stopGeneration() },
+                        onSaveClick = { imageUrl -> viewModel.saveImageToDownloads(imageUrl, settings.outputFormat) },
+                        onShareClick = { imageUrl -> viewModel.shareImage(imageUrl) }
+                    )
+                }
+                entry<Result> { key ->
+                    ResultScreen(
+                        finalImageUrl = key.imageUrl,
+                        seed = key.seed,
+                        onSaveClick = { viewModel.saveImageToDownloads(key.imageUrl, settings.outputFormat) },
+                        onShareClick = { viewModel.shareImage(key.imageUrl) },
+                        onReRunClick = {
+                            viewModel.resetState()
+                            // Clear up to Prompt
+                            while (backStack.size > 1) {
+                                backStack.removeLastOrNull()
+                            }
+                        }
+                    )
+                }
+                entry<Settings> {
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        viewModel.refreshSavedWorkflows()
+                    }
+                    val savedWorkflows by viewModel.savedWorkflows.collectAsState()
+                    val importState by viewModel.importState.collectAsState()
+                    val localModels by viewModel.localModels.collectAsState()
+                    SettingsScreen(
+                        settings = settings,
+                        savedWorkflows = savedWorkflows,
+                        importState = importState,
+                        localModels = localModels,
+                        onFetchLocalModelsClick = { url -> viewModel.fetchLocalModels(url) },
+                        onImportWorkflowClick = { ctx, uri -> viewModel.importWorkflow(ctx, uri) },
+                        onClearImportState = { viewModel.clearImportState() },
+                        onSaveClick = { updatedSettings ->
+                            viewModel.updateSettings(updatedSettings)
+                            Toast.makeText(context, "Settings Saved!", Toast.LENGTH_SHORT).show()
                             backStack.removeLastOrNull()
+                        },
+                        onBackClick = { backStack.removeLastOrNull() },
+                        onDownloadWorkflowClick = { viewModel.downloadWorkflow() },
+                        onViewLogsClick = { backStack.add(Logs) }
+                    )
+                }
+                entry<Logs> {
+                    LogsScreen(
+                        onBackClick = { backStack.removeLastOrNull() }
+                    )
+                }
+                entry<Gallery> {
+                    val galleryItems by viewModel.galleryItems.collectAsState()
+                    GalleryScreen(
+                        items = galleryItems,
+                        onBackClick = { backStack.removeLastOrNull() },
+                        onReRunClick = { promptText ->
+                            viewModel.updatePrompt(promptText)
+                            // Clear up to Prompt (Home)
+                            while (backStack.size > 1) {
+                                backStack.removeLastOrNull()
+                            }
+                        },
+                        onShareClick = { url -> viewModel.shareImage(url) },
+                        onDeleteClick = { id -> viewModel.deleteGalleryItem(id) },
+                        onDownloadClick = { url -> viewModel.saveImageToDownloads(url, settings.outputFormat) }
+                    )
+                }
+            }
+        )
+
+        val currentScreen = backStack.lastOrNull()
+        val showFab = queueJobs.isNotEmpty() && currentScreen != null && currentScreen !is Progress
+
+        if (showFab) {
+            com.example.comfyprompt.ui.screens.QueueFAB(
+                queueSize = queueJobs.size,
+                onClick = { showBottomSheet = true },
+                modifier = androidx.compose.ui.Modifier
+                    .align(androidx.compose.ui.Alignment.BottomEnd)
+                    .padding(16.dp)
+            )
+        }
+
+        if (showBottomSheet) {
+            androidx.compose.material3.ModalBottomSheet(
+                onDismissRequest = { showBottomSheet = false },
+                sheetState = sheetState,
+                containerColor = com.example.comfyprompt.theme.DarkGray,
+                scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f)
+            ) {
+                com.example.comfyprompt.ui.screens.QueueBottomSheetContent(
+                    queueJobs = queueJobs,
+                    activeJobId = activeJobId,
+                    onCancelJob = { jobId -> viewModel.cancelJob(jobId) },
+                    onClearAll = { viewModel.clearAllJobs() },
+                    onJobClick = { jobId ->
+                        showBottomSheet = false
+                        if (backStack.lastOrNull() !is Progress) {
+                            backStack.add(Progress)
                         }
                     },
-                    onShareClick = { url -> viewModel.shareImage(url) },
-                    onDeleteClick = { id -> viewModel.deleteGalleryItem(id) },
-                    onDownloadClick = { url -> viewModel.saveImageToDownloads(url, settings.outputFormat) }
+                    onDismiss = { showBottomSheet = false }
                 )
             }
         }
-    )
+    }
 }
+

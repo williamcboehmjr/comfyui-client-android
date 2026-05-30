@@ -52,6 +52,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _settings = MutableStateFlow(settingsManager.getSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
+    private val _queueList = MutableStateFlow<List<com.example.comfyprompt.data.QueueJob>>(emptyList())
+    val queueList: StateFlow<List<com.example.comfyprompt.data.QueueJob>> = _queueList.asStateFlow()
+
+    private val _activeJobId = MutableStateFlow<String?>(null)
+    val activeJobId: StateFlow<String?> = _activeJobId.asStateFlow()
+
+
     private val _importState = MutableStateFlow<ImportState>(ImportState.Idle)
     val importState: StateFlow<ImportState> = _importState.asStateFlow()
 
@@ -156,33 +163,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         refreshSavedWorkflows()
         viewModelScope.launch {
             ComfyClient.progressFlow.collect { progress ->
-                if (progress.state == GenerationState.Completed && progress.finalImage != null) {
-                    val currentSettings = _settings.value
-                    val seed = when (currentSettings.seedMode) {
-                        SeedMode.Fixed -> currentSettings.fixedSeedValue
-                        SeedMode.Custom -> currentSettings.customSeedValue
-                        else -> currentSettings.lastUsedSeedValue
-                    }
+                val activeId = _activeJobId.value
+                if (activeId != null) {
+                    updateJobProgress(activeId, progress)
+                }
+
+                if (progress.state == GenerationState.Completed || 
+                    progress.state == GenerationState.Failed || 
+                    progress.state == GenerationState.Cancelled) {
                     
-                    val items = settingsManager.getGalleryItems().toMutableList()
-                    // Avoid duplicate records for the same generation
-                    if (items.none { it.imageUrl == progress.finalImage }) {
-                        items.add(
-                            0, // Prepend new items to display latest first
-                            com.example.comfyprompt.data.GalleryItem(
-                                imageUrl = progress.finalImage,
-                                prompt = currentPrompt.value,
-                                enhancedPrompt = progress.enhancedPrompt,
-                                seed = seed
-                            )
-                        )
-                        settingsManager.saveGalleryItems(items)
-                        _galleryItems.value = items
+                    if (!com.example.comfyprompt.MainActivity.isAppInForeground) {
+                        sendLocalNotification(progress, activeId)
                     }
+
+                    if (progress.state == GenerationState.Completed && progress.finalImage != null) {
+                        val activeJob = _queueList.value.firstOrNull { it.id == activeId }
+                        val currentSettings = activeJob?.settings ?: _settings.value
+                        val seed = when (currentSettings.seedMode) {
+                            SeedMode.Fixed -> currentSettings.fixedSeedValue
+                            SeedMode.Custom -> currentSettings.customSeedValue
+                            else -> currentSettings.lastUsedSeedValue
+                        }
+                        
+                        val items = settingsManager.getGalleryItems().toMutableList()
+                        if (items.none { it.imageUrl == progress.finalImage }) {
+                            items.add(
+                                0,
+                                com.example.comfyprompt.data.GalleryItem(
+                                    imageUrl = progress.finalImage,
+                                    prompt = activeJob?.prompt ?: currentPrompt.value,
+                                    enhancedPrompt = progress.enhancedPrompt,
+                                    seed = seed
+                                )
+                            )
+                            settingsManager.saveGalleryItems(items)
+                            _galleryItems.value = items
+                        }
+                    }
+
+                    _queueList.value = _queueList.value.filter { it.id != activeId }
+                    _activeJobId.value = null
+                    processQueueNext()
                 }
             }
         }
     }
+
 
     fun deleteGalleryItem(id: String) {
         val items = settingsManager.getGalleryItems().toMutableList()
@@ -230,44 +256,151 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _currentPrompt.value = prompt
-        viewModelScope.launch {
-            val currentSettings = _settings.value
-            
-            val hasApiKey = when (currentSettings.apiProvider) {
-                "ChatGPT" -> currentSettings.chatgptApiKey.isNotBlank()
-                "Claude" -> currentSettings.claudeApiKey.isNotBlank()
-                "Grok" -> currentSettings.grokApiKey.isNotBlank()
-                else -> currentSettings.geminiApiKey.isNotBlank()
-            }
-            
-            // 1. Enhance prompt if API key is provided AND enhancer is active
-            val finalPrompt = if (hasApiKey && currentSettings.enableEnhancer) {
-                // Reset state with enhancing status
-                ComfyClient.progressFlow.value = ProgressInfo(
-                    state = GenerationState.EnhancingPrompt,
-                    statusText = "Enhancing prompt with ${currentSettings.apiProvider}..."
-                )
-                val enhanced = GeminiClient.enhancePrompt(prompt, currentSettings)
-                ComfyClient.progressFlow.value = ComfyClient.progressFlow.value.copy(
-                    enhancedPrompt = enhanced
-                )
-                enhanced
-            } else {
-                // Reset state directly with connecting status
-                ComfyClient.progressFlow.value = ProgressInfo(
-                    state = GenerationState.ConnectingComfy,
-                    statusText = "Bypassing enhancer, connecting to ComfyUI..."
-                )
-                prompt
-            }
+        queueGeneration(prompt)
+    }
 
-            // 2. Start ComfyUI workflow execution
-            ComfyClient.startGeneration(getApplication(), finalPrompt, currentSettings) { generatedSeed ->
-                // Store the generated seed as "last used" for traceability
-                val updated = _settings.value.copy(lastUsedSeedValue = generatedSeed)
-                updateSettings(updated)
+    private fun queueGeneration(prompt: String) {
+        val job = com.example.comfyprompt.data.QueueJob(
+            prompt = prompt,
+            settings = _settings.value
+        )
+        _queueList.value = _queueList.value + job
+        AppLogger.i("MainViewModel", "Queued job: ${job.id}. Queue size: ${_queueList.value.size}")
+        processQueueNext()
+    }
+
+    private fun processQueueNext() {
+        val activeId = _activeJobId.value
+        if (activeId != null) {
+            AppLogger.d("MainViewModel", "Queue processing: job $activeId is already running")
+            return
+        }
+        val nextJob = _queueList.value.firstOrNull { it.progress.state == GenerationState.Idle }
+        if (nextJob == null) {
+            AppLogger.d("MainViewModel", "Queue is empty or all jobs are processed")
+            return
+        }
+        _activeJobId.value = nextJob.id
+        AppLogger.i("MainViewModel", "Starting queued job: ${nextJob.id}")
+        
+        viewModelScope.launch {
+            runJob(nextJob)
+        }
+    }
+
+    private suspend fun runJob(job: com.example.comfyprompt.data.QueueJob) {
+        val currentSettings = job.settings
+        
+        val hasApiKey = when (currentSettings.apiProvider) {
+            "ChatGPT" -> currentSettings.chatgptApiKey.isNotBlank()
+            "Claude" -> currentSettings.claudeApiKey.isNotBlank()
+            "Grok" -> currentSettings.grokApiKey.isNotBlank()
+            else -> currentSettings.geminiApiKey.isNotBlank()
+        }
+        
+        val finalPrompt = if (hasApiKey && currentSettings.enableEnhancer) {
+            updateJobProgress(job.id, ProgressInfo(
+                state = GenerationState.EnhancingPrompt,
+                statusText = "Enhancing prompt with ${currentSettings.apiProvider}..."
+            ))
+            val enhanced = GeminiClient.enhancePrompt(job.prompt, currentSettings)
+            updateJobProgress(job.id, ProgressInfo(
+                state = GenerationState.ConnectingComfy,
+                enhancedPrompt = enhanced,
+                statusText = "Bypassing enhancer, connecting to ComfyUI..."
+            ))
+            enhanced
+        } else {
+            updateJobProgress(job.id, ProgressInfo(
+                state = GenerationState.ConnectingComfy,
+                statusText = "Connecting to ComfyUI..."
+            ))
+            job.prompt
+        }
+
+        ComfyClient.startGeneration(getApplication(), finalPrompt, currentSettings) { generatedSeed ->
+            val updated = _settings.value.copy(lastUsedSeedValue = generatedSeed)
+            updateSettings(updated)
+        }
+    }
+
+    private fun updateJobProgress(jobId: String, progress: ProgressInfo) {
+        _queueList.value = _queueList.value.map {
+            if (it.id == jobId) {
+                it.copy(progress = progress)
+            } else {
+                it
             }
         }
+    }
+
+    fun cancelJob(jobId: String) {
+        val activeId = _activeJobId.value
+        if (jobId == activeId) {
+            AppLogger.i("MainViewModel", "Cancelling active job: $jobId")
+            stopGeneration()
+        } else {
+            AppLogger.i("MainViewModel", "Cancelling pending job: $jobId")
+            _queueList.value = _queueList.value.filter { it.id != jobId }
+        }
+    }
+
+    fun clearAllJobs() {
+        AppLogger.i("MainViewModel", "Clearing all queued jobs")
+        val activeId = _activeJobId.value
+        if (activeId != null) {
+            stopGeneration()
+        }
+        _queueList.value = emptyList()
+        _activeJobId.value = null
+    }
+
+    private fun sendLocalNotification(progress: ProgressInfo, jobId: String?) {
+        val context = getApplication<Application>()
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "comfyui_notifications",
+                "Image Generation Status",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications for ComfyUI generation jobs"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val title = when (progress.state) {
+            GenerationState.Completed -> "Generation Complete! ✨"
+            GenerationState.Failed -> "Generation Failed ❌"
+            else -> "Job Status Update"
+        }
+        val text = when (progress.state) {
+            GenerationState.Completed -> "Your image is ready to view in Gallery."
+            GenerationState.Failed -> progress.statusText
+            else -> progress.statusText
+        }
+
+        val intent = Intent(context, com.example.comfyprompt.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = androidx.core.app.NotificationCompat.Builder(context, "comfyui_notifications")
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notificationManager.notify(jobId?.hashCode() ?: 9999, notification)
     }
 
     fun stopGeneration() {
@@ -277,6 +410,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun resetState() {
         ComfyClient.progressFlow.value = ProgressInfo(state = GenerationState.Idle)
     }
+
 
     fun saveImageToDownloads(imageUrl: String, format: String) {
         viewModelScope.launch(Dispatchers.IO) {
