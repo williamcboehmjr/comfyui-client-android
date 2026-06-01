@@ -7,18 +7,45 @@
 
 **ComfyUI Client** is a state-of-the-art, fully native Android application designed to interface with any ComfyUI server. It allows you to run complex stable diffusion workflows, customize prompts, generate images, and manage generation parameters directly from your pocket.
 
-<p align="center">
-  <img src="screenshots/Screenshot_1780357648.png" width="220" alt="Main Prompter Screen"/>
-  <img src="screenshots/Screenshot_1780357655.png" width="220" alt="Settings & Model Config"/>
-  <img src="screenshots/Screenshot_1780357682.png" width="220" alt="Active Generation Progress"/>
-  <img src="screenshots/Screenshot_1780357696.png" width="220" alt="Vision Chat Prompter Refiner"/>
-</p>
-<p align="center">
-  <img src="screenshots/Screenshot_1780357699.png" width="220" alt="Multimodal Chat Attachments"/>
-  <img src="screenshots/Screenshot_1780357719.png" width="220" alt="Prompt Refinement Suggestions"/>
-  <img src="screenshots/Screenshot_1780357728.png" width="220" alt="Creations History & Gallery"/>
-  <img src="screenshots/Screenshot_1780357735.png" width="220" alt="OLED Details & Past Creations Refine"/>
-</p>
+## 📱 App Showcase & Feature Tour
+
+### 🎨 Core Prompt & Connection Interface
+Explore the core generation environment, including standard aspect ratios, resolution modifiers, and secure local/cloud configurations:
+
+| 🏠 01. Main Prompter (Portrait) | ⚙️ 02. Active Connections Setup | 📈 03. Active Run Progress |
+| :---: | :---: | :---: |
+| <img src="screenshots/01_main_screen_portrait.png" width="240" alt="Main Screen"/> | <img src="screenshots/02_settings_screen_portrait.png" width="240" alt="Connections Settings"/> | <img src="screenshots/03_progress_screen_portrait.png" width="240" alt="Realtime progress monitoring"/> |
+| Enter prompts, choose seeds, and customize outputs easily. | Secure local connection and Active AI Prompt Expander setup. | Real-time generation percentage and base/intermediate image views. |
+
+---
+
+### 🧠 Multimodal Vision Refiner (Gemini 3.5 Flash)
+Tweak, refine, and visually context-align your generation prompts through fully in-RAM vision conversation:
+
+| 💬 04. Refiner Chat Intro | 📎 05. Multimodal Attachments & Suggestions |
+| :---: | :---: |
+| <img src="screenshots/04_vision_refiner_chat_intro.png" width="300" alt="Vision Chat Intro"/> | <img src="screenshots/05_vision_refiner_chat_suggestions.png" width="300" alt="Vision Tweak Suggestions"/> |
+| Transient Vision Assistant analyzes active output for context. | Upload reference context files, dictation support, and view prompt suggests. |
+
+---
+
+### 🖼️ Creations History & Detail Gallery
+Browse past generations, save locally, share natively, or instantly reload and refine prompts from history:
+
+| 🗃️ 06. Local Creations Grid | 📑 07. Details Popup Card | 🔍 08. Zoomed Immersive View |
+| :---: | :---: | :---: |
+| <img src="screenshots/06_creations_gallery_grid.png" width="240" alt="Gallery Grid"/> | <img src="screenshots/07_gallery_details_modal.png" width="240" alt="Gallery Detail sheet"/> | <img src="screenshots/08_gallery_zoomed_view.png" width="240" alt="Zoom view"/> |
+| OLED historical creation grids with cached high-performance cells. | Reload prompts, copy enhanced models, or trigger past vision refinement. | High-performance ZoomableImage canvas overlays. |
+
+---
+
+### 📖 Unfolded Foldable/Tablet Interface
+Enjoy premium large screen partitioning:
+
+| 🗺️ 09. OLED Side-by-Side Split View (Unfolded Tablet / Foldable) |
+| :---: |
+| <img src="screenshots/09_unfolded_tablet_split_view.png" width="600" alt="Tablet Side-by-Side view"/> |
+| Left pane holds prompter details and system action controls, right pane holds the active prompt vision refiner panel side-by-side. |
 
 > [!NOTE]
 > This application communicates directly with your self-hosted ComfyUI instance. No proprietary third-party servers are required!
