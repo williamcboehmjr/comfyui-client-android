@@ -79,7 +79,8 @@ fun QueueBottomSheetContent(
     queueJobs: List<QueueJob>,
     activeJobId: String?,
     onCancelJob: (String) -> Unit,
-    onClearAll: () -> Unit,
+    onClearPending: () -> Unit,
+    onStopAll: () -> Unit,
     onJobClick: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -127,21 +128,47 @@ fun QueueBottomSheetContent(
             }
 
             if (queueJobs.isNotEmpty()) {
-                TextButton(
-                    onClick = onClearAll,
-                    colors = ButtonDefaults.textButtonColors(contentColor = AccentRed)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ClearAll,
-                        contentDescription = "Clear All",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Clear All",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
+                    TextButton(
+                        onClick = onClearPending,
+                        colors = ButtonDefaults.textButtonColors(contentColor = AccentGray)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ClearAll,
+                            contentDescription = "Clear Queue",
+                            modifier = Modifier.size(18.dp),
+                            tint = AccentGray
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Clear Queue",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = AccentGray
+                        )
+                    }
+
+                    TextButton(
+                        onClick = onStopAll,
+                        colors = ButtonDefaults.textButtonColors(contentColor = AccentRed)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Stop All",
+                            modifier = Modifier.size(18.dp),
+                            tint = AccentRed
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Stop All",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = AccentRed
+                        )
+                    }
                 }
             }
         }

@@ -89,6 +89,7 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                         onGenerateClick = { promptText ->
                             viewModel.generateImage(promptText)
                             Toast.makeText(context, "Prompt added to queue", Toast.LENGTH_SHORT).show()
+                            backStack.add(Progress)
                         },
                         onSettingsClick = { backStack.add(Settings) },
                         onGalleryClick = { backStack.add(Gallery) },
@@ -128,6 +129,7 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                     ResultScreen(
                         finalImageUrl = key.imageUrl,
                         seed = key.seed,
+                        settings = settings,
                         onSaveClick = { viewModel.saveImageToDownloads(key.imageUrl, settings.outputFormat) },
                         onShareClick = { viewModel.shareImage(key.imageUrl) },
                         onReRunClick = {
@@ -136,7 +138,16 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                             while (backStack.size > 1) {
                                 backStack.removeLastOrNull()
                             }
-                        }
+                        },
+                        onUsePromptClick = { refinedPrompt ->
+                            viewModel.generateImage(refinedPrompt)
+                            viewModel.resetState()
+                            while (backStack.size > 1) {
+                                backStack.removeLastOrNull()
+                            }
+                            backStack.add(Progress)
+                        },
+                        viewModel = viewModel
                     )
                 }
                 entry<Settings> {
@@ -173,6 +184,7 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                     val galleryItems by viewModel.galleryItems.collectAsState()
                     GalleryScreen(
                         items = galleryItems,
+                        enableEnhancer = settings.enableEnhancer,
                         onBackClick = { backStack.removeLastOrNull() },
                         onReRunClick = { promptText ->
                             viewModel.updatePrompt(promptText)
@@ -183,14 +195,17 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                         },
                         onShareClick = { url -> viewModel.shareImage(url) },
                         onDeleteClick = { id -> viewModel.deleteGalleryItem(id) },
-                        onDownloadClick = { url -> viewModel.saveImageToDownloads(url, settings.outputFormat) }
+                        onDownloadClick = { url -> viewModel.saveImageToDownloads(url, settings.outputFormat) },
+                        onRefinePromptClick = { imageUrl, seed ->
+                            backStack.add(Result(imageUrl, seed))
+                        }
                     )
                 }
             }
         )
 
         val currentScreen = backStack.lastOrNull()
-        val showFab = queueJobs.isNotEmpty() && currentScreen != null && currentScreen !is Progress
+        val showFab = queueJobs.isNotEmpty() && currentScreen != null
 
         if (showFab) {
             com.example.comfyprompt.ui.screens.QueueFAB(
@@ -213,7 +228,8 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                     queueJobs = queueJobs,
                     activeJobId = activeJobId,
                     onCancelJob = { jobId -> viewModel.cancelJob(jobId) },
-                    onClearAll = { viewModel.clearAllJobs() },
+                    onClearPending = { viewModel.clearPendingQueue() },
+                    onStopAll = { viewModel.stopAllJobs() },
                     onJobClick = { jobId ->
                         showBottomSheet = false
                         if (backStack.lastOrNull() !is Progress) {

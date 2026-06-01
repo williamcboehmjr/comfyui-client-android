@@ -127,3 +127,16 @@ data class QueueJob(
     val settings: AppSettings
 )
 
+enum class MessageSender {
+    USER, AI
+}
+
+data class ChatMessage(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val sender: MessageSender,
+    val text: String,
+    val imageUrls: List<String> = emptyList(),
+    val refinedPrompt: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
+)
+

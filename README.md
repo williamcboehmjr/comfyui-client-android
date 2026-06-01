@@ -8,9 +8,16 @@
 **ComfyUI Client** is a state-of-the-art, fully native Android application designed to interface with any ComfyUI server. It allows you to run complex stable diffusion workflows, customize prompts, generate images, and manage generation parameters directly from your pocket.
 
 <p align="center">
-  <img src="screenshots/main_screen.png" width="260" alt="Main Interface"/>
-  <img src="screenshots/settings_screen.png" width="260" alt="Settings Screen"/>
-  <img src="screenshots/generating_screen.png" width="260" alt="Generation Processing"/>
+  <img src="screenshots/Screenshot_1780357648.png" width="220" alt="Main Prompter Screen"/>
+  <img src="screenshots/Screenshot_1780357655.png" width="220" alt="Settings & Model Config"/>
+  <img src="screenshots/Screenshot_1780357682.png" width="220" alt="Active Generation Progress"/>
+  <img src="screenshots/Screenshot_1780357696.png" width="220" alt="Vision Chat Prompter Refiner"/>
+</p>
+<p align="center">
+  <img src="screenshots/Screenshot_1780357699.png" width="220" alt="Multimodal Chat Attachments"/>
+  <img src="screenshots/Screenshot_1780357719.png" width="220" alt="Prompt Refinement Suggestions"/>
+  <img src="screenshots/Screenshot_1780357728.png" width="220" alt="Creations History & Gallery"/>
+  <img src="screenshots/Screenshot_1780357735.png" width="220" alt="OLED Details & Past Creations Refine"/>
 </p>
 
 > [!NOTE]
@@ -33,6 +40,9 @@
 
 ### 🖼️ Seamless Mobile UX
 *   **Prompt Enhancer Integration**: Features built-in AI adapters (supporting Gemini, ChatGPT, Claude, Grok, and local/custom OpenAI-compatible endpoints) to expand simple input prompts into beautiful visual styles.
+*   **Vision-Powered Refiner Chat**: Transient, fully in-RAM vision dialog utilizing background Gemini 3.5 Flash. Upload gallery reference photos, dictate prompts with local microphone input, and review side-by-side prompt suggestions.
+*   **Interactive Creations Refinery**: Click any previous output in the Gallery to instantly reload or refine the prompt with vision chat overlays.
+*   **Granular Multi-Job Queue**: Floating Queue FAB showing active generation counts with detailed bottom sheet split action controls: "Clear Queue" (clears pending jobs, leaving the active one intact) and "Stop All" (aborts current generation and empties the queue).
 *   **Dynamic Gallery & Viewer**: Stores generation history locally with high-performance caching. Tap any item to view in full-screen, or instantly invoke native Android Share and Download operations.
 *   **Settings Suite**: Easily configure host URL, megapixels, desired aspect ratios, and model specifications.
 

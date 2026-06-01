@@ -944,13 +944,27 @@ fun ProgressScreen(
 fun ResultScreen(
     finalImageUrl: String,
     seed: Long,
+    settings: AppSettings,
     onSaveClick: () -> Unit,
     onShareClick: () -> Unit,
-    onReRunClick: () -> Unit
+    onReRunClick: () -> Unit,
+    onUsePromptClick: (String) -> Unit,
+    viewModel: com.example.comfyprompt.ui.MainViewModel
 ) {
     var isFullScreen by remember { mutableStateOf(false) }
+    var isChatOpen by remember { mutableStateOf(false) }
+    var attachedUris by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+    val messages by viewModel.copilotMessages.collectAsState()
+    val isCopilotLoading by viewModel.isCopilotLoading.collectAsState()
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isExpandedScreen = configuration.screenWidthDp >= 600
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.clearCopilotChat()
+        }
+    }
 
     val reRunButton = @Composable {
         OutlinedButton(
@@ -996,6 +1010,36 @@ fun ResultScreen(
         }
     }
 
+    val copilotButton = @Composable {
+        Button(
+            onClick = {
+                isChatOpen = !isChatOpen
+                if (isChatOpen) {
+                    viewModel.initCopilotChat()
+                } else {
+                    viewModel.clearCopilotChat()
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isChatOpen) SuccessGreen else Color(0xFF2563EB),
+                contentColor = Color.White
+            ),
+            shape = RoundedCornerShape(28.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("REFINE PROMPT", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        }
+    }
+
     val imageCanvas = @Composable {
         Box(
             modifier = Modifier
@@ -1022,21 +1066,177 @@ fun ResultScreen(
             containerColor = Color.Black
         ) { paddingValues ->
             if (isExpandedScreen) {
-                // Unfolded side-by-side Row layout
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp)
-                ) {
+                // Expanded landscape screen
+                if (isChatOpen && settings.enableEnhancer) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                imageCanvas()
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    OutlinedButton(
+                                        onClick = onReRunClick,
+                                        modifier = Modifier.fillMaxSize(),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                        border = BorderStroke(1.dp, Color.White),
+                                        shape = RoundedCornerShape(25.dp),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Text("BACK", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                                Box(modifier = Modifier.weight(1f)) {
+                                    OutlinedButton(
+                                        onClick = onShareClick,
+                                        modifier = Modifier.fillMaxSize(),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                        border = BorderStroke(1.dp, Color.White),
+                                        shape = RoundedCornerShape(25.dp),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Text("SHARE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                                Box(modifier = Modifier.weight(1.2f)) {
+                                    Button(
+                                        onClick = onSaveClick,
+                                        modifier = Modifier.fillMaxSize(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                        shape = RoundedCornerShape(25.dp),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Text("DOWNLOAD", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        CopilotChatPanel(
+                            messages = messages,
+                            isLoading = isCopilotLoading,
+                            onSendMessage = { txt, uris ->
+                                viewModel.sendCopilotMessage(context, txt, finalImageUrl, uris)
+                                attachedUris = emptyList()
+                            },
+                            onUsePromptClick = onUsePromptClick,
+                            onCloseChat = {
+                                isChatOpen = false
+                                viewModel.clearCopilotChat()
+                            },
+                            attachedUris = attachedUris,
+                            onAddAttachment = { uri -> attachedUris = attachedUris + uri },
+                            onRemoveAttachment = { uri -> attachedUris = attachedUris.filter { it != uri } },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "COMPLETED OUTPUT",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = AccentGray,
+                                letterSpacing = 1.5.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(24.dp))
+                            reRunButton()
+                            shareButton()
+                            if (settings.enableEnhancer) {
+                                copilotButton()
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            saveButton()
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1.3f)
+                                .fillMaxHeight()
+                        ) {
+                            imageCanvas()
+                        }
+                    }
+                }
+            } else {
+                // Phones portrait screen
+                if (isChatOpen && settings.enableEnhancer) {
                     Column(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(0.7f)
+                        ) {
+                            imageCanvas()
+                        }
+
+                        CopilotChatPanel(
+                            messages = messages,
+                            isLoading = isCopilotLoading,
+                            onSendMessage = { txt, uris ->
+                                viewModel.sendCopilotMessage(context, txt, finalImageUrl, uris)
+                                attachedUris = emptyList()
+                            },
+                            onUsePromptClick = onUsePromptClick,
+                            onCloseChat = {
+                                isChatOpen = false
+                                viewModel.clearCopilotChat()
+                            },
+                            attachedUris = attachedUris,
+                            onAddAttachment = { uri -> attachedUris = attachedUris + uri },
+                            onRemoveAttachment = { uri -> attachedUris = attachedUris.filter { it != uri } },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1.3f)
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
                             "COMPLETED OUTPUT",
@@ -1046,62 +1246,60 @@ fun ResultScreen(
                             letterSpacing = 1.5.sp
                         )
 
-                        Spacer(modifier = Modifier.height(24.dp))
-                        reRunButton()
-                        shareButton()
-                        Spacer(modifier = Modifier.height(16.dp))
-                        saveButton()
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1.3f)
-                            .fillMaxHeight()
-                    ) {
-                        imageCanvas()
-                    }
-                }
-            } else {
-                // Folded stacked Column layout
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        "COMPLETED OUTPUT",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = AccentGray,
-                        letterSpacing = 1.5.sp
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                    ) {
-                        imageCanvas()
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            reRunButton()
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                        ) {
+                            imageCanvas()
                         }
-                        Box(modifier = Modifier.weight(1f)) {
-                            shareButton()
+
+                        if (settings.enableEnhancer) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    reRunButton()
+                                }
+                                Box(modifier = Modifier.weight(1f)) {
+                                    shareButton()
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    copilotButton()
+                                }
+                                Box(modifier = Modifier.weight(1f)) {
+                                    saveButton()
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    reRunButton()
+                                }
+                                Box(modifier = Modifier.weight(1f)) {
+                                    shareButton()
+                                }
+                            }
+
+                            saveButton()
                         }
                     }
-
-                    saveButton()
                 }
             }
         }
@@ -1124,6 +1322,407 @@ fun ResultScreen(
                     contentScale = ContentScale.Fit,
                     shape = androidx.compose.ui.graphics.RectangleShape,
                     onTap = { isFullScreen = false }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CopilotChatPanel(
+    messages: List<com.example.comfyprompt.data.ChatMessage>,
+    isLoading: Boolean,
+    onSendMessage: (String, List<android.net.Uri>) -> Unit,
+    onUsePromptClick: (String) -> Unit,
+    onCloseChat: () -> Unit,
+    attachedUris: List<android.net.Uri>,
+    onAddAttachment: (android.net.Uri) -> Unit,
+    onRemoveAttachment: (android.net.Uri) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var textInput by remember { mutableStateOf("") }
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            lazyListState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            val spokenResults = data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+            if (!spokenResults.isNullOrEmpty()) {
+                textInput = spokenResults[0]
+            }
+        }
+    }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            onAddAttachment(uri)
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+    ) {
+        // Chat Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF0F172A))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = Color(0xFF3B82F6),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "REFINE PROMPT CHAT",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    letterSpacing = 1.sp
+                )
+            }
+            IconButton(
+                onClick = onCloseChat,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        // Messages List
+        androidx.compose.foundation.lazy.LazyColumn(
+            state = lazyListState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(messages.size) { index ->
+                val msg = messages[index]
+                val isUser = msg.sender == com.example.comfyprompt.data.MessageSender.USER
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f),
+                        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
+                    ) {
+                        Text(
+                            text = if (isUser) "You" else "Refiner",
+                            color = AccentGray,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(bottom = 2.dp)
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .clip(
+                                    if (isUser) RoundedCornerShape(
+                                        topStart = 12.dp,
+                                        topEnd = 12.dp,
+                                        bottomStart = 12.dp,
+                                        bottomEnd = 0.dp
+                                    ) else RoundedCornerShape(
+                                        topStart = 12.dp,
+                                        topEnd = 12.dp,
+                                        bottomStart = 0.dp,
+                                        bottomEnd = 12.dp
+                                    )
+                                )
+                                .background(if (isUser) Color(0xFF1E3A8A) else CardGray)
+                                .padding(12.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (msg.imageUrls.isNotEmpty()) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    ) {
+                                        msg.imageUrls.forEach { imgUrl ->
+                                            AsyncImage(
+                                                model = imgUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(60.dp)
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Color.DarkGray),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = msg.text,
+                                    color = Color.White,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+
+                        if (msg.refinedPrompt != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, Color(0xFF2563EB).copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Star,
+                                            contentDescription = null,
+                                            tint = Color(0xFF2563EB),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Suggested Refined Prompt",
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+
+                                    Text(
+                                        text = msg.refinedPrompt,
+                                        color = AccentGray,
+                                        fontSize = 12.sp,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                    )
+
+                                    Button(
+                                        onClick = { onUsePromptClick(msg.refinedPrompt) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(40.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF2563EB),
+                                            contentColor = Color.White
+                                        ),
+                                        shape = RoundedCornerShape(20.dp),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("USE ADJUSTED PROMPT", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isLoading) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(0.85f),
+                            horizontalAlignment = Alignment.Start
+                        ) {
+                            Text(
+                                text = "Refiner",
+                                color = AccentGray,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topStart = 12.dp,
+                                            topEnd = 12.dp,
+                                            bottomStart = 0.dp,
+                                            bottomEnd = 12.dp
+                                        )
+                                    )
+                                    .background(CardGray)
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text(
+                                        text = "Refining vision...",
+                                        color = AccentGray,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (attachedUris.isNotEmpty()) {
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF0F172A))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(attachedUris.size) { index ->
+                    val uri = attachedUris[index]
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    ) {
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        IconButton(
+                            onClick = { onRemoveAttachment(uri) },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(18.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(bottomStart = 6.dp))
+                                .padding(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Remove",
+                                tint = Color.White,
+                                modifier = Modifier.size(10.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF0F172A))
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            IconButton(
+                onClick = { imagePickerLauncher.launch("image/*") },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Attach image",
+                    tint = Color.White
+                )
+            }
+
+            OutlinedTextField(
+                value = textInput,
+                onValueChange = { textInput = it },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(max = 100.dp),
+                placeholder = { Text("Describe changes...", color = AccentGray, fontSize = 14.sp) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = DarkGray,
+                    unfocusedContainerColor = DarkGray,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                ),
+                shape = RoundedCornerShape(20.dp),
+                maxLines = 4
+            )
+
+            IconButton(
+                onClick = {
+                    val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak changes...")
+                    }
+                    try {
+                        speechRecognizerLauncher.launch(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Speech recognition not available", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Dictate",
+                    tint = Color.White
+                )
+            }
+
+            IconButton(
+                onClick = {
+                    if (textInput.isNotBlank() || attachedUris.isNotEmpty()) {
+                        onSendMessage(textInput, attachedUris)
+                        textInput = ""
+                    }
+                },
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color(0xFF2563EB), RoundedCornerShape(20.dp)),
+                enabled = textInput.isNotBlank() || attachedUris.isNotEmpty()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Send",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -2123,11 +2722,13 @@ fun SettingsScreen(
 @Composable
 fun GalleryScreen(
     items: List<GalleryItem>,
+    enableEnhancer: Boolean,
     onBackClick: () -> Unit,
     onReRunClick: (String) -> Unit,
     onShareClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
-    onDownloadClick: (String) -> Unit
+    onDownloadClick: (String) -> Unit,
+    onRefinePromptClick: (String, Long) -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isExpandedScreen = configuration.screenWidthDp >= 600
@@ -2363,24 +2964,75 @@ fun GalleryScreen(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text("Load Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     }
+
+                                    if (enableEnhancer) {
+                                        Button(
+                                            onClick = {
+                                                onRefinePromptClick(item.imageUrl, item.seed)
+                                                selectedItem = null
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White),
+                                            shape = RoundedCornerShape(20.dp),
+                                            modifier = Modifier.weight(1.2f)
+                                        ) {
+                                            Icon(Icons.Default.Star, contentDescription = "Refine", modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Refine Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             } else {
                                 Column(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Button(
-                                        onClick = {
-                                            onReRunClick(item.prompt)
-                                            selectedItem = null
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                                        shape = RoundedCornerShape(20.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Load Prompt", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    if (enableEnhancer) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Button(
+                                                onClick = {
+                                                    onReRunClick(item.prompt)
+                                                    selectedItem = null
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                                shape = RoundedCornerShape(20.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Load Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            Button(
+                                                onClick = {
+                                                    onRefinePromptClick(item.imageUrl, item.seed)
+                                                    selectedItem = null
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White),
+                                                shape = RoundedCornerShape(20.dp),
+                                                modifier = Modifier.weight(1.1f)
+                                            ) {
+                                                Icon(Icons.Default.Star, contentDescription = "Refine", modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Refine Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = {
+                                                onReRunClick(item.prompt)
+                                                selectedItem = null
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                            shape = RoundedCornerShape(20.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Load Prompt", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
 
                                     Row(

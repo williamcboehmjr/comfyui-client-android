@@ -129,6 +129,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _localModels = MutableStateFlow<List<String>>(emptyList())
     val localModels: StateFlow<List<String>> = _localModels.asStateFlow()
 
+    private val _progressInfo = MutableStateFlow(ProgressInfo())
+    val progressInfo: StateFlow<ProgressInfo> = _progressInfo.asStateFlow()
+
     fun fetchLocalModels(baseUrl: String) {
         viewModelScope.launch {
             try {
@@ -164,8 +167,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             ComfyClient.progressFlow.collect { progress ->
                 val activeId = _activeJobId.value
+                val activeJob = _queueList.value.firstOrNull { it.id == activeId }
+                val currentEnhancedPrompt = activeJob?.progress?.enhancedPrompt
+                val mergedProgress = progress.copy(
+                    enhancedPrompt = currentEnhancedPrompt ?: progress.enhancedPrompt
+                )
+
                 if (activeId != null) {
-                    updateJobProgress(activeId, progress)
+                    updateJobProgress(activeId, mergedProgress)
+                    _progressInfo.value = mergedProgress
+                } else {
+                    _progressInfo.value = mergedProgress
                 }
 
                 if (progress.state == GenerationState.Completed || 
@@ -173,11 +185,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     progress.state == GenerationState.Cancelled) {
                     
                     if (!com.example.comfyprompt.MainActivity.isAppInForeground) {
-                        sendLocalNotification(progress, activeId)
+                        sendLocalNotification(mergedProgress, activeId)
                     }
 
                     if (progress.state == GenerationState.Completed && progress.finalImage != null) {
-                        val activeJob = _queueList.value.firstOrNull { it.id == activeId }
                         val currentSettings = activeJob?.settings ?: _settings.value
                         val seed = when (currentSettings.seedMode) {
                             SeedMode.Fixed -> currentSettings.fixedSeedValue
@@ -192,7 +203,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 com.example.comfyprompt.data.GalleryItem(
                                     imageUrl = progress.finalImage,
                                     prompt = activeJob?.prompt ?: currentPrompt.value,
-                                    enhancedPrompt = progress.enhancedPrompt,
+                                    enhancedPrompt = mergedProgress.enhancedPrompt,
                                     seed = seed
                                 )
                             )
@@ -222,8 +233,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _currentPrompt.value = prompt
         settingsManager.saveLastPrompt(prompt)
     }
-
-    val progressInfo: StateFlow<ProgressInfo> = ComfyClient.progressFlow
 
     fun updateSettings(newSettings: AppSettings) {
         if (newSettings.hostType == com.example.comfyprompt.data.HostType.LOCAL) {
@@ -299,22 +308,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         val finalPrompt = if (hasApiKey && currentSettings.enableEnhancer) {
-            updateJobProgress(job.id, ProgressInfo(
+            val progress1 = ProgressInfo(
                 state = GenerationState.EnhancingPrompt,
                 statusText = "Enhancing prompt with ${currentSettings.apiProvider}..."
-            ))
+            )
+            updateJobProgress(job.id, progress1)
+            _progressInfo.value = progress1
+
             val enhanced = GeminiClient.enhancePrompt(job.prompt, currentSettings)
-            updateJobProgress(job.id, ProgressInfo(
+
+            val progress2 = ProgressInfo(
                 state = GenerationState.ConnectingComfy,
                 enhancedPrompt = enhanced,
-                statusText = "Bypassing enhancer, connecting to ComfyUI..."
-            ))
+                statusText = "Enhanced with ${currentSettings.apiProvider}, connecting to ComfyUI..."
+            )
+            updateJobProgress(job.id, progress2)
+            _progressInfo.value = progress2
             enhanced
         } else {
-            updateJobProgress(job.id, ProgressInfo(
+            val progress1 = ProgressInfo(
                 state = GenerationState.ConnectingComfy,
-                statusText = "Connecting to ComfyUI..."
-            ))
+                statusText = "Bypassing enhancer, connecting to ComfyUI..."
+            )
+            updateJobProgress(job.id, progress1)
+            _progressInfo.value = progress1
             job.prompt
         }
 
@@ -345,14 +362,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun clearAllJobs() {
-        AppLogger.i("MainViewModel", "Clearing all queued jobs")
+    fun stopAllJobs() {
+        AppLogger.i("MainViewModel", "Stopping active generation and clearing all queued jobs")
         val activeId = _activeJobId.value
         if (activeId != null) {
             stopGeneration()
         }
         _queueList.value = emptyList()
         _activeJobId.value = null
+    }
+
+    fun clearPendingQueue() {
+        AppLogger.i("MainViewModel", "Clearing pending queued jobs from the queue")
+        val activeId = _activeJobId.value
+        if (activeId != null) {
+            _queueList.value = _queueList.value.filter { it.id == activeId }
+        } else {
+            _queueList.value = emptyList()
+        }
     }
 
     private fun sendLocalNotification(progress: ProgressInfo, jobId: String?) {
@@ -604,6 +631,128 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     Toast.makeText(context, "Download Failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    private val _copilotMessages = MutableStateFlow<List<com.example.comfyprompt.data.ChatMessage>>(emptyList())
+    val copilotMessages: StateFlow<List<com.example.comfyprompt.data.ChatMessage>> = _copilotMessages.asStateFlow()
+
+    private val _isCopilotLoading = MutableStateFlow(false)
+    val isCopilotLoading: StateFlow<Boolean> = _isCopilotLoading.asStateFlow()
+
+    private val copilotImageBase64Cache = mutableMapOf<String, String>()
+
+    fun initCopilotChat() {
+        if (_copilotMessages.value.isEmpty()) {
+            _copilotMessages.value = listOf(
+                com.example.comfyprompt.data.ChatMessage(
+                    sender = com.example.comfyprompt.data.MessageSender.AI,
+                    text = "Hi! I'm your Prompt Refiner Assistant. I've analyzed your generated image. Tell me what changes you'd like to make, or upload reference images for context, and I'll help you refine the prompt!"
+                )
+            )
+        }
+    }
+
+    fun clearCopilotChat() {
+        _copilotMessages.value = emptyList()
+        copilotImageBase64Cache.clear()
+    }
+
+    fun sendCopilotMessage(
+        context: Context,
+        text: String,
+        generatedImageUrl: String,
+        attachedUris: List<Uri>
+    ) {
+        if (text.isBlank() && attachedUris.isEmpty()) return
+
+        viewModelScope.launch {
+            _isCopilotLoading.value = true
+
+            val imageUrls = mutableListOf<String>()
+
+            val isFirstUserTurn = _copilotMessages.value.none { it.sender == com.example.comfyprompt.data.MessageSender.USER }
+            if (isFirstUserTurn) {
+                imageUrls.add(generatedImageUrl)
+                val cached = copilotImageBase64Cache[generatedImageUrl]
+                if (cached == null) {
+                    val base64 = downloadImageAsBase64(generatedImageUrl)
+                    if (base64 != null) {
+                        copilotImageBase64Cache[generatedImageUrl] = base64
+                    }
+                }
+            }
+
+            attachedUris.forEach { uri ->
+                val uriString = uri.toString()
+                imageUrls.add(uriString)
+                val base64 = getUriAsBase64(context, uri)
+                if (base64 != null) {
+                    copilotImageBase64Cache[uriString] = base64
+                }
+            }
+
+            val userMessage = com.example.comfyprompt.data.ChatMessage(
+                sender = com.example.comfyprompt.data.MessageSender.USER,
+                text = text,
+                imageUrls = imageUrls
+            )
+
+            _copilotMessages.value = _copilotMessages.value + userMessage
+
+            val allMessages = _copilotMessages.value
+            val responseText = GeminiClient.chatWithCopilot(allMessages, copilotImageBase64Cache, _settings.value)
+
+            val marker = "REFINED_PROMPT:"
+            val refinedPrompt = if (responseText.contains(marker)) {
+                responseText.substringAfter(marker).trim()
+            } else {
+                null
+            }
+            val conversationalText = if (responseText.contains(marker)) {
+                responseText.substringBefore(marker).trim()
+            } else {
+                responseText
+            }
+
+            val aiMessage = com.example.comfyprompt.data.ChatMessage(
+                sender = com.example.comfyprompt.data.MessageSender.AI,
+                text = conversationalText,
+                refinedPrompt = refinedPrompt
+            )
+
+            _copilotMessages.value = _copilotMessages.value + aiMessage
+            _isCopilotLoading.value = false
+        }
+    }
+
+    private suspend fun downloadImageAsBase64(imageUrl: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val client = OkHttpClient()
+            val request = Request.Builder().url(imageUrl).build()
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val bytes = response.body?.bytes()
+                    if (bytes != null) {
+                        return@withContext android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.e("MainViewModel", "Failed to download image for base64: ${e.message}")
+        }
+        null
+    }
+
+    private fun getUriAsBase64(context: Context, uri: Uri): String? {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                val bytes = inputStream.readBytes()
+                android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            }
+        } catch (e: Exception) {
+            AppLogger.e("MainViewModel", "Failed to convert URI to base64: ${e.message}")
+            null
         }
     }
 }
