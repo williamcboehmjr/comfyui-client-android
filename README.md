@@ -36,10 +36,10 @@ Tweak, refine, and visually context-align your generation prompts through fully 
 ### 🖼️ Creations History & Detail Gallery
 Browse past generations, save locally, share natively, or instantly reload and refine prompts from history:
 
-| 🗃️ 06. Local Creations Grid | 📑 07. Details Popup Card | 🔍 08. Zoomed Immersive View |
-| :---: | :---: | :---: |
-| <img src="screenshots/06_creations_gallery_grid.png" width="240" alt="Gallery Grid"/> | <img src="screenshots/07_gallery_details_modal.png" width="240" alt="Gallery Detail sheet"/> | <img src="screenshots/08_gallery_zoomed_view.png" width="240" alt="Zoom view"/> |
-| OLED historical creation grids with cached high-performance cells. | Reload prompts, copy enhanced models, or trigger past vision refinement. | High-performance ZoomableImage canvas overlays. |
+| 🗃️ 06. Local Creations Grid | 📑 07. Details Popup Card |
+| :---: | :---: |
+| <img src="screenshots/06_creations_gallery_grid.png" width="300" alt="Gallery Grid"/> | <img src="screenshots/07_gallery_details_modal.png" width="300" alt="Gallery Detail sheet"/> |
+| OLED historical creation grids with cached high-performance cells. | Reload prompts, copy enhanced models, or trigger past vision refinement. |
 
 ---
 
@@ -132,15 +132,21 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 ---
 
-## 🔮 Future Roadmap
+## 🔮 Feature Roadmap & Milestones
 
-We are active developers looking to mold this client into the ultimate mobile generative experience. Here is what is planned next:
+We are molding this client into the ultimate mobile generative experience. Here is what we have accomplished and what is coming next:
 
+### 🚀 Recently Completed Features
+*   **Cloud Host Integrations**: Orchestration with serverless and GPU providers (including **RunPod Serverless**, **Fal.ai**, and **ComfyDeploy**) with smart local fallback logic.
+*   **Active Job Queue Management**: Stop, abort, and clear controls via the Floating Queue FAB bottom sheets (Clear Queue vs. Stop All).
+*   **Mobile-Optimized Tweaks**: Native UI panels on the main prompter screen for adjusting seed parameters, resolutions, and aspect ratios directly from simple cards.
+*   **Cryptographically Secure API Storage**: Storage of all active model keys (Gemini, ChatGPT, Claude, Grok, etc.) using Android's native `EncryptedSharedPreferences` sandbox.
+*   **Request Rate Limiting**: Built-in 5-second generator cooldown trigger to prevent duplicate generation fires and local server rate limit errors.
+*   **Universal Graph-to-API Engine**: Position-aligned node widget mapping and dangling link recovery to translate raw "UI-format" JSON workflows into server-ready "API-format" payloads.
+
+### 🔮 Planned Next Steps
 *   **Toggle Groups**: Support for toggling LiteGraph groups directly from the Android app UI to enable/disable entire workflow segments.
-*   **Cloud Host Integrations**: Support for direct orchestration with GPU providers like **RunPod** and other serverless compute providers.
-*   **Server Queue Management**: Full native interfaces to queue, pause, clear, and prioritize ComfyUI jobs directly from the device.
-*   **Mobile-Optimized Tweaks**: Custom user interfaces for editing seed models, sampler configurations, and native node parameters in simple cards.
-*   **Multi-Platform Support (iOS)**: If there is sufficient interest and backing, we plan to release a premium paid application on both Google Play Store and Apple App Store to support continued development.
+*   **Multi-Platform Support (iOS)**: If there is sufficient interest and backing, we plan to release a premium paid version on both Google Play Store and Apple App Store to support continued development.
 
 ---
 
