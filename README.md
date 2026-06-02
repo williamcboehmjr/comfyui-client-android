@@ -140,6 +140,28 @@ We are active developers looking to mold this client into the ultimate mobile ge
 
 ---
 
+## 🤝 Collaboration & AI Co-Creation (Antigravity & Gemini)
+
+This client is the result of an extraordinary co-creation journey between its creator and **Antigravity**, a powerful agentic AI coding assistant developed by Google DeepMind. 
+
+Because the creator of this client is not a professional developer, the application was built hand-in-hand through dynamic interactive pair programming. The partnership leveraged **Gemini 3.5 Flash** on its highest fidelity mode to architect:
+*   Complex Jetpack Compose user interfaces and smooth motion designs.
+*   WebSocket event hooks for low-latency status reporting.
+*   A universal graph-transformation engine to handle advanced ComfyUI workflow conversions.
+
+This successful synergy demonstrates the potential of agentic AI co-creation: turning ideas into premium, production-grade applications that anyone can build from scratch.
+
+---
+
+## 🔒 Security, Keys, and Private Context
+
+We hold security and private data context in the highest regard. To ensure complete safety:
+*   **Encrypted Storage**: All sensitive API keys (e.g., Gemini, ChatGPT, Claude, Grok, or local server tokens) are stored locally using Android's native `EncryptedSharedPreferences` (AES-256 GCM encryption) inside the private app sandbox. They are never written in plaintext and are never exposed to debug logs.
+*   **No Third-Party Telemetry**: The application contains no analytics packages, usage tracking, or external reporting channels. All ComfyUI API calls and WebSocket connections occur directly between your mobile device and your self-hosted host server.
+*   **Zero-Exposure Sanitization**: The source code and repository structure have been thoroughly audited and sanitized. Strict `.gitignore` rules prevent private keys, build scripts, local properties, and compiler caches from ever being pushed to version control, ensuring no personal credentials or environment details are exposed.
+
+---
+
 ## 📄 License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
