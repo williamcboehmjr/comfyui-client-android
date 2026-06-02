@@ -5,7 +5,11 @@
 [![Compose](https://img.shields.io/badge/Jetpack-Compose-blue.svg)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**ComfyUI Client** is a state-of-the-art, fully native Android application designed to interface with any ComfyUI server. It allows you to run complex stable diffusion workflows, customize prompts, generate images, and manage generation parameters directly from your pocket.
+**ComfyUI Client** is a fully native Android application designed to interface with your ComfyUI server. 
+
+Let's be completely honest: trying to use ComfyUI's dense, node-based desktop layout inside Chrome or Safari on a mobile screen is an exercise in pure frustration. Panning, zooming, and dragging spaghetti connection links on a 6-inch display is a recipe for accidental node mutations and lost patience. And nobody wants to spend hours manually converting every single custom workflow into a standalone app using ComfyUI's Node 2.0 app framework. 
+
+This client was born out of a simple, selfish need: **just let me prompt and go.** It hooks up your existing backend workflows and lets you run them natively on your phone or tablet with high-fidelity, touch-friendly mobile layouts. 
 
 ## 📱 App Showcase & Feature Tour
 
@@ -140,16 +144,17 @@ We are active developers looking to mold this client into the ultimate mobile ge
 
 ---
 
-## 🤝 Collaboration & AI Co-Creation (Antigravity & Gemini)
+## 🤝 The "AI Slop" Confession & Co-Creation Story
 
-This client is the result of an extraordinary co-creation journey between its creator and **Antigravity**, a powerful agentic AI coding assistant developed by Google DeepMind. 
+Let's address the giant robot in the room: yes, this app is fully vibe-coded. We know the internet is currently drowning in "AI slop" wrappers, half-baked templates, and generic copy-paste projects. But we promise you, this isn't one of those cash-grabs. 
 
-Because the creator of this client is not a professional developer, the application was built hand-in-hand through dynamic interactive pair programming. The partnership leveraged **Gemini 3.5 Flash** on its highest fidelity mode to architect:
-*   Complex Jetpack Compose user interfaces and smooth motion designs.
-*   WebSocket event hooks for low-latency status reporting.
-*   A universal graph-transformation engine to handle advanced ComfyUI workflow conversions.
+First of all, **this app is not for sale.** It was created by someone who is decidedly *not* a professional developer, but who was simply tired of squinting at a tiny phone screen trying to connect virtual widgets in ComfyUI's web interface. 
 
-This successful synergy demonstrates the potential of agentic AI co-creation: turning ideas into premium, production-grade applications that anyone can build from scratch.
+To solve this, the creator teamed up with **Antigravity**, a powerful agentic AI coding assistant developed by Google DeepMind. Together, they went full "mad scientist" mode, using **Gemini 3.5 Flash** on its highest settings to hammer out a real, native Android app. 
+
+While the human provided the architectural specifications, the aesthetic direction, and the relentless quality checks, Antigravity handled the heavy lifting under the hood, compiling Kotlin code, setting up WebSocket listeners, and securing encrypted preference managers. 
+
+So yes, it is an AI-assisted build. But it's an AI-assisted build driven by pure, unfiltered laziness and a desire to make ComfyUI actually usable on a couch. And we think that is a beautiful thing.
 
 ---
 
