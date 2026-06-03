@@ -1,0 +1,254 @@
+{
+  "92": {
+    "inputs": {
+      "width": [
+        "759",
+        0
+      ],
+      "height": [
+        "759",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {
+      "title": "Empty Flux 2 Latent"
+    }
+  },
+  "94": {
+    "inputs": {
+      "samples": [
+        "777",
+        0
+      ],
+      "vae": [
+        "104",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "95": {
+    "inputs": {
+      "seed": [
+        "761",
+        0
+      ],
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "seeds_2",
+      "scheduler": "linear_quadratic",
+      "denoise": 1,
+      "model": [
+        "107",
+        0
+      ],
+      "positive": [
+        "96",
+        0
+      ],
+      "negative": [
+        "105",
+        0
+      ],
+      "latent_image": [
+        "92",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "96": {
+    "inputs": {
+      "text": [
+        "758",
+        0
+      ],
+      "clip": [
+        "103",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "103": {
+    "inputs": {
+      "clip_name": "ministral-3-3b.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "104": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "105": {
+    "inputs": {
+      "conditioning": [
+        "96",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "107": {
+    "inputs": {
+      "sage_attention": "auto",
+      "allow_compile": true,
+      "model": [
+        "745",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
+  },
+  "745": {
+    "inputs": {
+      "unet_name": "ernieBadmilkReal_v10.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "757": {
+    "inputs": {
+      "value": "a vaporwave livingroom photo"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "String (Multiline)"
+    }
+  },
+  "758": {
+    "inputs": {
+      "styles": "fooocus_styles",
+      "select_styles": "Fooocus Cinematic",
+      "positive": [
+        "757",
+        0
+      ]
+    },
+    "class_type": "easy stylesSelector",
+    "_meta": {
+      "title": "Styles Selector"
+    }
+  },
+  "759": {
+    "inputs": {
+      "megapixel": "1.0",
+      "aspect_ratio": "16:9 (Panorama)",
+      "divisible_by": "64",
+      "custom_ratio": false,
+      "custom_aspect_ratio": "1:1"
+    },
+    "class_type": "FluxResolutionNode",
+    "_meta": {
+      "title": "Flux Resolution Calc"
+    }
+  },
+  "760": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "94",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "761": {
+    "inputs": {
+      "seed": -1
+    },
+    "class_type": "Seed (rgthree)",
+    "_meta": {
+      "title": "Seed (rgthree)"
+    }
+  },
+  "777": {
+    "inputs": {
+      "eta": 0,
+      "sampler_name": "linear/euler",
+      "scheduler": "simple",
+      "steps": 999,
+      "steps_to_run": -1,
+      "denoise": 1,
+      "cfg": 1,
+      "seed": [
+        "761",
+        0
+      ],
+      "sampler_mode": "standard",
+      "bongmath": true,
+      "model": [
+        "107",
+        0
+      ],
+      "positive": [
+        "96",
+        0
+      ],
+      "negative": [
+        "105",
+        0
+      ],
+      "latent_image": [
+        "92",
+        0
+      ],
+      "sigmas": [
+        "778",
+        0
+      ]
+    },
+    "class_type": "ClownsharKSampler_Beta",
+    "_meta": {
+      "title": "ClownsharKSampler"
+    }
+  },
+  "778": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 8,
+      "denoise": 1,
+      "model": [
+        "107",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  }
+}
