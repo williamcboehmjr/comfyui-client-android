@@ -52,6 +52,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _settings = MutableStateFlow(settingsManager.getSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
+    private var lastWakeTriggerTime: Long = 0L
+    private var isPollingActive: Boolean = false
+
     private val _queueList = MutableStateFlow<List<com.example.comfyprompt.data.QueueJob>>(emptyList())
     val queueList: StateFlow<List<com.example.comfyprompt.data.QueueJob>> = _queueList.asStateFlow()
 
@@ -184,6 +187,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     progress.state == GenerationState.Failed || 
                     progress.state == GenerationState.Cancelled) {
                     
+                    if (progress.state == GenerationState.Failed) {
+                        val currentSettings = activeJob?.settings ?: _settings.value
+                        if (currentSettings.triggerCmdEnabled && 
+                            currentSettings.hostType == com.example.comfyprompt.data.HostType.LOCAL &&
+                            progress.statusText.contains("Connection error", ignoreCase = true)) {
+                            
+                            val now = System.currentTimeMillis()
+                            if (now - lastWakeTriggerTime > 5 * 60 * 1000) {
+                                lastWakeTriggerTime = now
+                                triggerAutoWakeAndPoll(currentSettings)
+                            }
+                        }
+                    }
+
                     if (!com.example.comfyprompt.MainActivity.isAppInForeground) {
                         sendLocalNotification(mergedProgress, activeId)
                     }
@@ -754,5 +771,97 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             AppLogger.e("MainViewModel", "Failed to convert URI to base64: ${e.message}")
             null
         }
+    }
+
+    private fun triggerAutoWakeAndPoll(settings: AppSettings) {
+        viewModelScope.launch {
+            // Show user a toast indicating server is offline and wake is triggered
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(
+                    getApplication(),
+                    "Local server offline. Sent wake signal to TRIGGERcmd!",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+
+            AppLogger.i("MainViewModel", "Triggering TRIGGERcmd auto-wake call...")
+            val success = com.example.comfyprompt.network.TriggerCmdClient.wakeServer(
+                token = settings.triggerCmdToken,
+                trigger = settings.triggerCmdName,
+                computer = settings.triggerCmdComputer
+            )
+
+            if (success) {
+                // Check if we already have a polling job running
+                if (isPollingActive) {
+                    AppLogger.d("MainViewModel", "Polling loop is already active. Skipping duplicate spawn.")
+                    return@launch
+                }
+
+                viewModelScope.launch(Dispatchers.IO) {
+                    isPollingActive = true
+                    AppLogger.i("MainViewModel", "TRIGGERcmd woke successfully! Starting ComfyUI server polling loop...")
+                    var serverUp = false
+                    val startPollTime = System.currentTimeMillis()
+                    // Poll for up to 5 minutes
+                    while (System.currentTimeMillis() - startPollTime < 5 * 60 * 1000) {
+                        if (!isPollingActive) break
+                        if (com.example.comfyprompt.network.TriggerCmdClient.pollLocalServer(settings.serverUrl)) {
+                            serverUp = true
+                            break
+                        }
+                        kotlinx.coroutines.delay(5000) // Poll every 5 seconds
+                    }
+
+                    if (serverUp) {
+                        AppLogger.i("MainViewModel", "ComfyUI server is confirmed online! Sending ready notification...")
+                        sendLocalServerReadyNotification()
+                    } else {
+                        AppLogger.w("MainViewModel", "ComfyUI server polling timed out after 5 minutes.")
+                    }
+                    isPollingActive = false
+                }
+            }
+        }
+    }
+
+    private fun sendLocalServerReadyNotification() {
+        val context = getApplication<Application>()
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "comfyui_notifications",
+                "Image Generation Status",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications for ComfyUI generation jobs"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val title = "ComfyUI Server Ready! ✨"
+        val text = "Your local ComfyUI server is online and ready for generations."
+
+        val intent = Intent(context, com.example.comfyprompt.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = androidx.core.app.NotificationCompat.Builder(context, "comfyui_notifications")
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notificationManager.notify(8888, notification)
     }
 }

@@ -1788,6 +1788,13 @@ fun SettingsScreen(
     var showRunpodApiKey by remember { mutableStateOf(false) }
     var showFalAiApiKey by remember { mutableStateOf(false) }
 
+    // TRIGGERcmd configuration states
+    var triggerCmdEnabled by remember { mutableStateOf(settings.triggerCmdEnabled) }
+    var triggerCmdToken by remember { mutableStateOf(settings.triggerCmdToken) }
+    var triggerCmdName by remember { mutableStateOf(settings.triggerCmdName) }
+    var triggerCmdComputer by remember { mutableStateOf(settings.triggerCmdComputer) }
+    var showTriggerCmdToken by remember { mutableStateOf(false) }
+
     val isSaveEnabled = remember(selectedHostType, localIpAddress) {
         if (selectedHostType == HostType.LOCAL) {
             UrlValidator.validateUrl(localIpAddress) !is ValidationResult.Error
@@ -2542,6 +2549,126 @@ fun SettingsScreen(
                 }
             }
 
+            // TRIGGERcmd Auto-Wake Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CardGray),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "AUTOMATIC LOCAL HOST WAKE (TRIGGERcmd)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentGray
+                            )
+                            Text(
+                                "Auto-start your ComfyUI server if offline using a TRIGGERcmd task.",
+                                fontSize = 12.sp,
+                                color = LightGray
+                            )
+                        }
+                        Switch(
+                            checked = triggerCmdEnabled,
+                            onCheckedChange = { triggerCmdEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = SuccessGreen
+                            )
+                        )
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(visible = triggerCmdEnabled) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "TRIGGERcmd Configuration",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                "API Token",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LightGray
+                            )
+                            OutlinedTextField(
+                                value = triggerCmdToken,
+                                onValueChange = { triggerCmdToken = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.White,
+                                    unfocusedBorderColor = AccentGray,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                ),
+                                visualTransformation = if (showTriggerCmdToken) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    Text(
+                                        text = if (showTriggerCmdToken) "HIDE" else "SHOW",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .padding(end = 12.dp)
+                                            .clickable { showTriggerCmdToken = !showTriggerCmdToken }
+                                    )
+                                }
+                            )
+
+                            Text(
+                                "Trigger Name",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LightGray
+                            )
+                            OutlinedTextField(
+                                value = triggerCmdName,
+                                onValueChange = { triggerCmdName = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.White,
+                                    unfocusedBorderColor = AccentGray,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                )
+                            )
+
+                            Text(
+                                "Computer Name (Optional)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LightGray
+                            )
+                            OutlinedTextField(
+                                value = triggerCmdComputer,
+                                onValueChange = { triggerCmdComputer = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Defaults to primary computer", color = AccentGray) },
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.White,
+                                    unfocusedBorderColor = AccentGray,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Diagnostics & Logs Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -2602,7 +2729,11 @@ fun SettingsScreen(
                         localLlmSelectedModel = localLlmSelectedModel,
                         apiProvider = apiProvider,
                         outputFormat = outputFormat,
-                        workflowToUse = workflowToUse
+                        workflowToUse = workflowToUse,
+                        triggerCmdEnabled = triggerCmdEnabled,
+                        triggerCmdToken = triggerCmdToken,
+                        triggerCmdName = triggerCmdName,
+                        triggerCmdComputer = triggerCmdComputer
                     )
                     onSaveClick(updatedSettings)
                 },

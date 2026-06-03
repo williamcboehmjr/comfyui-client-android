@@ -130,7 +130,11 @@ class SettingsManager(context: Context) {
             falAiApiKey = getSensitiveKey("fal_ai_api_key", ""),
             falAiEndpointSlug = prefs.getString("fal_ai_endpoint_slug", "") ?: "",
             localLlmBaseUrl = prefs.getString("local_llm_base_url", "http://10.0.2.2:1234/v1") ?: "http://10.0.2.2:1234/v1",
-            localLlmSelectedModel = prefs.getString("local_llm_selected_model", "") ?: ""
+            localLlmSelectedModel = prefs.getString("local_llm_selected_model", "") ?: "",
+            triggerCmdEnabled = prefs.getBoolean("trigger_cmd_enabled", false),
+            triggerCmdToken = getSensitiveKey("trigger_cmd_token", ""),
+            triggerCmdName = prefs.getString("trigger_cmd_name", "Comfy_Start") ?: "Comfy_Start",
+            triggerCmdComputer = prefs.getString("trigger_cmd_computer", "") ?: ""
         )
     }
 
@@ -144,6 +148,7 @@ class SettingsManager(context: Context) {
             putString("comfy_deploy_api_key", settings.comfyDeployApiKey)
             putString("runpod_api_key", settings.runpodApiKey)
             putString("fal_ai_api_key", settings.falAiApiKey)
+            putString("trigger_cmd_token", settings.triggerCmdToken)
             apply()
         }
 
@@ -173,6 +178,9 @@ class SettingsManager(context: Context) {
             putString("fal_ai_endpoint_slug", settings.falAiEndpointSlug)
             putString("local_llm_base_url", settings.localLlmBaseUrl)
             putString("local_llm_selected_model", settings.localLlmSelectedModel)
+            putBoolean("trigger_cmd_enabled", settings.triggerCmdEnabled)
+            putString("trigger_cmd_name", settings.triggerCmdName)
+            putString("trigger_cmd_computer", settings.triggerCmdComputer)
 
             // Remove legacy plain-text sensitive keys from regular preferences if present
             remove("gemini_key")
@@ -182,6 +190,7 @@ class SettingsManager(context: Context) {
             remove("comfy_deploy_api_key")
             remove("runpod_api_key")
             remove("fal_ai_api_key")
+            remove("trigger_cmd_token")
             
             apply()
         }

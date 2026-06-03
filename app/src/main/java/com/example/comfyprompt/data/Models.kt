@@ -49,7 +49,11 @@ data class AppSettings(
     val falAiApiKey: String = "",
     val falAiEndpointSlug: String = "",
     val localLlmBaseUrl: String = "http://10.0.2.2:1234/v1",
-    val localLlmSelectedModel: String = ""
+    val localLlmSelectedModel: String = "",
+    val triggerCmdEnabled: Boolean = false,
+    val triggerCmdToken: String = "",
+    val triggerCmdName: String = "Comfy_Start",
+    val triggerCmdComputer: String = ""
 )
 
 data class ProgressInfo(
