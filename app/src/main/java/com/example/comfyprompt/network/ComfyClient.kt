@@ -38,6 +38,10 @@ object ComfyClient {
     private var activeSeed: Long = 42L
     internal var activeSaveImageNodeId: String = "760"
 
+    internal var activeServerUrl: String? = null
+    private var webSocketRetryCount = 0
+    private const val MAX_WEBSOCKET_RETRIES = 5
+
     val progressFlow = MutableStateFlow(ProgressInfo())
     internal val clientScope = CoroutineScope(Dispatchers.IO)
     internal var activeGenerationJob: kotlinx.coroutines.Job? = null
@@ -82,6 +86,7 @@ object ComfyClient {
         onSeedGenerated: (Long) -> Unit
     ) {
         activeGenerationJob?.cancel()
+        webSocketRetryCount = 0
         activeGenerationJob = clientScope.launch {
             try {
                 // Initialize state
@@ -553,6 +558,7 @@ object ComfyClient {
 
     internal fun connectWebSocket(serverUrl: String) {
         disconnectWebSocket() // Ensure clean slate
+        activeServerUrl = serverUrl
 
         val cleanUrl = serverUrl.removeSuffix("/").replace("http://", "ws://").replace("https://", "wss://")
         val wsUrl = "$cleanUrl/ws?clientId=$clientId"
@@ -562,6 +568,7 @@ object ComfyClient {
         activeWebSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 AppLogger.d("ComfyClient", "WebSocket successfully connected to server!")
+                webSocketRetryCount = 0
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -659,7 +666,25 @@ object ComfyClient {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                AppLogger.e("ComfyClient", "WebSocket connection failed")
+                AppLogger.e("ComfyClient", "WebSocket connection failed", t)
+                
+                val current = progressFlow.value
+                if (current.state != GenerationState.Completed && 
+                    current.state != GenerationState.Cancelled &&
+                    current.state != GenerationState.Failed &&
+                    currentPromptId != null) {
+                    
+                    if (webSocketRetryCount < MAX_WEBSOCKET_RETRIES) {
+                        webSocketRetryCount++
+                        AppLogger.w("ComfyClient", "WebSocket disconnected. Reconnecting in 2s (attempt $webSocketRetryCount/$MAX_WEBSOCKET_RETRIES)...")
+                        clientScope.launch {
+                            kotlinx.coroutines.delay(2000)
+                            activeServerUrl?.let { connectWebSocket(it) }
+                        }
+                        return
+                    }
+                }
+
                 // Only show connection error if we aren't already completed/cancelled
                 if (progressFlow.value.state != GenerationState.Completed && 
                     progressFlow.value.state != GenerationState.Cancelled) {

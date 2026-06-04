@@ -20,15 +20,17 @@ object TriggerCmdClient {
     
     // Strict timeout client for quick pings
     private val pingClient = OkHttpClient.Builder()
-        .connectTimeout(2, TimeUnit.SECONDS)
-        .readTimeout(2, TimeUnit.SECONDS)
-        .writeTimeout(2, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
         .build()
 
     private val wakeClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
         .writeTimeout(5, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
         .build()
 
     suspend fun wakeServer(token: String, trigger: String, computer: String): Boolean = withContext(Dispatchers.IO) {
@@ -74,6 +76,17 @@ object TriggerCmdClient {
         return@withContext false
     }
 
+    private fun isHostUnreachableException(e: Exception): Boolean {
+        if (e is java.net.UnknownHostException) return true
+        if (e is java.net.NoRouteToHostException) return true
+        val msg = e.localizedMessage ?: ""
+        val lower = msg.lowercase(java.util.Locale.ROOT)
+        return lower.contains("no route to host") || 
+               lower.contains("network is unreachable") ||
+               lower.contains("enetunreach") ||
+               lower.contains("ehostunreach")
+    }
+
     suspend fun pollLocalServer(serverUrl: String): PingResult = withContext(Dispatchers.IO) {
         val cleanUrl = serverUrl.removeSuffix("/")
         try {
@@ -90,13 +103,36 @@ object TriggerCmdClient {
         } catch (e: Exception) {
             val msg = e.localizedMessage ?: ""
             AppLogger.d("TriggerCmdClient", "Ping local server failed to connect to $cleanUrl (normal if booting): $msg")
+            
+            if (isHostUnreachableException(e)) {
+                return@withContext PingResult.HOST_UNREACHABLE
+            }
+
             val isRefused = msg.contains("refused", ignoreCase = true) || 
                             msg.contains("Connection refused", ignoreCase = true)
             if (isRefused) {
                 return@withContext PingResult.HOST_ALIVE_SERVER_DOWN
-            } else {
-                return@withContext PingResult.HOST_UNREACHABLE
             }
+
+            // Run a quick ICMP ping check to see if the host is reachable
+            try {
+                val uri = java.net.URI(cleanUrl)
+                val host = uri.host
+                if (host != null && host.isNotBlank()) {
+                    val process = Runtime.getRuntime().exec(arrayOf("/system/bin/ping", "-c", "1", "-W", "2", host))
+                    val exitVal = process.waitFor()
+                    if (exitVal == 0) {
+                        AppLogger.d("TriggerCmdClient", "ICMP ping to $host succeeded. Host is alive, ComfyUI server is down/booting.")
+                        return@withContext PingResult.HOST_ALIVE_SERVER_DOWN
+                    } else {
+                        AppLogger.d("TriggerCmdClient", "ICMP ping to $host failed with exit code $exitVal.")
+                    }
+                }
+            } catch (pingEx: Exception) {
+                AppLogger.d("TriggerCmdClient", "Failed to run ICMP ping check: ${pingEx.localizedMessage}")
+            }
+
+            return@withContext PingResult.HOST_UNREACHABLE
         }
     }
 }

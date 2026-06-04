@@ -202,6 +202,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     progress.state == GenerationState.Failed || 
                     progress.state == GenerationState.Cancelled) {
                     
+                    var shouldRemoveJob = true
                     if (progress.state == GenerationState.Failed) {
                         if (currentSettings.triggerCmdEnabled && 
                             currentSettings.hostType == com.example.comfyprompt.data.HostType.LOCAL &&
@@ -209,8 +210,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             
                             val now = System.currentTimeMillis()
                             if (now - lastWakeTriggerTime > 5 * 60 * 1000) {
+                                shouldRemoveJob = false
                                 lastWakeTriggerTime = now
                                 startWakeSequence(currentSettings)
+                            } else if (_serverWakeState.value is ServerWakeState.Waking || _serverWakeState.value is ServerWakeState.Polling) {
+                                shouldRemoveJob = false
                             }
                         }
                     }
@@ -243,7 +247,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
 
-                    _queueList.value = _queueList.value.filter { it.id != activeId }
+                    if (shouldRemoveJob) {
+                        _queueList.value = _queueList.value.filter { it.id != activeId }
+                    }
                     _activeJobId.value = null
                     processQueueNext()
                 }
@@ -329,6 +335,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun runJob(job: com.example.comfyprompt.data.QueueJob) {
+        val context = getApplication<Application>()
+        com.example.comfyprompt.network.GenerationService.start(context)
         val currentSettings = job.settings
         
         val hasApiKey = when (currentSettings.apiProvider) {
@@ -463,6 +471,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopGeneration() {
         ComfyClient.stopGeneration(_settings.value)
+        com.example.comfyprompt.network.GenerationService.stop(getApplication())
     }
 
     fun resetState() {
@@ -858,12 +867,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             serverUp = true
                             break
                         }
-                        
-                        if (result == com.example.comfyprompt.network.PingResult.HOST_UNREACHABLE) {
-                            _serverWakeState.value = ServerWakeState.HostUnreachable
-                        } else {
-                            _serverWakeState.value = ServerWakeState.Polling
-                        }
+                        // We do not need to show HostUnreachable during the loop. It's just offline/booting.
+                        _serverWakeState.value = ServerWakeState.Polling
                         
                         kotlinx.coroutines.delay(5000)
                     }
@@ -879,6 +884,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
 
                         withContext(Dispatchers.Main) {
+                            // Reset failed connection-error jobs to Idle to auto-retry
+                            _queueList.value = _queueList.value.map { job ->
+                                if (job.progress.state == GenerationState.Failed && 
+                                    isConnectionError(job.progress.statusText)) {
+                                    job.copy(progress = ProgressInfo(state = GenerationState.Idle))
+                                } else {
+                                    job
+                                }
+                            }
+                            processQueueNext()
+
                             android.widget.Toast.makeText(
                                 getApplication(),
                                 "ComfyUI Server is online and ready! ✨",
