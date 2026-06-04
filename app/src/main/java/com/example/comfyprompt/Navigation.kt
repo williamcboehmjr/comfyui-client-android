@@ -93,7 +93,7 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                 if (currentScreen is Progress) {
                     val isTriggerCmdEnabled = settings.triggerCmdEnabled && 
                             settings.hostType == com.example.comfyprompt.data.HostType.LOCAL &&
-                            progressInfo.statusText.contains("Connection error", ignoreCase = true)
+                            viewModel.isConnectionError(progressInfo.statusText)
                     
                     if (!isTriggerCmdEnabled) {
                         Toast.makeText(context, progressInfo.statusText, Toast.LENGTH_LONG).show()

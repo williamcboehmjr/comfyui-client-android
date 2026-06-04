@@ -119,7 +119,7 @@ fun ServerWakeScreen(
             // Main Status Text
             val statusHeader = when (wakeState) {
                 is ServerWakeState.Waking -> "Waking ComfyUI Server..."
-                is ServerWakeState.Polling -> "Waiting for Server... ⏳"
+                is ServerWakeState.Polling -> "Waiting for ComfyUI to load... ⏳"
                 is ServerWakeState.Success -> "Server Found! ✨"
                 is ServerWakeState.Timeout -> "Wake Timeout"
                 else -> "Offline Check"

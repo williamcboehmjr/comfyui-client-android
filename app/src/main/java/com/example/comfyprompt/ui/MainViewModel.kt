@@ -205,7 +205,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (progress.state == GenerationState.Failed) {
                         if (currentSettings.triggerCmdEnabled && 
                             currentSettings.hostType == com.example.comfyprompt.data.HostType.LOCAL &&
-                            progress.statusText.contains("Connection error", ignoreCase = true)) {
+                            isConnectionError(progress.statusText)) {
                             
                             val now = System.currentTimeMillis()
                             if (now - lastWakeTriggerTime > 5 * 60 * 1000) {
@@ -796,6 +796,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelWakeSequence() {
         isPollingActive = false
         _serverWakeState.value = ServerWakeState.Idle
+    }
+
+    fun isConnectionError(statusText: String): Boolean {
+        val lower = statusText.lowercase(java.util.Locale.ROOT)
+        return lower.contains("connection error") || 
+               lower.contains("connection failed") || 
+               lower.contains("failed to connect") ||
+               lower.contains("unreachable") ||
+               lower.contains("socket timeout") ||
+               lower.contains("refused")
     }
 
     fun startWakeSequence(settings: AppSettings) {
