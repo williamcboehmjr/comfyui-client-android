@@ -20,6 +20,7 @@ import com.example.comfyprompt.data.SeedMode
 import com.example.comfyprompt.data.SettingsManager
 import com.example.comfyprompt.data.FormatType
 import com.example.comfyprompt.data.ConversionResult
+import com.example.comfyprompt.data.ServerWakeState
 import com.example.comfyprompt.network.ComfyClient
 import com.example.comfyprompt.network.GeminiClient
 import com.example.comfyprompt.network.UrlValidator
@@ -55,6 +56,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var lastWakeTriggerTime: Long = 0L
     @kotlin.jvm.Volatile
     private var isPollingActive: Boolean = false
+
+    private val _serverWakeState = MutableStateFlow<ServerWakeState>(ServerWakeState.Idle)
+    val serverWakeState: StateFlow<ServerWakeState> = _serverWakeState.asStateFlow()
 
     private val _queueList = MutableStateFlow<List<com.example.comfyprompt.data.QueueJob>>(emptyList())
     val queueList: StateFlow<List<com.example.comfyprompt.data.QueueJob>> = _queueList.asStateFlow()
@@ -172,6 +176,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ComfyClient.progressFlow.collect { progress ->
                 val activeId = _activeJobId.value
                 val activeJob = _queueList.value.firstOrNull { it.id == activeId }
+                val currentSettings = activeJob?.settings ?: _settings.value
+
+                // Clear wake cooldown immediately if connection succeeds
+                if (currentSettings.hostType == com.example.comfyprompt.data.HostType.LOCAL &&
+                    (progress.state == GenerationState.ConnectingComfy || 
+                     progress.state == GenerationState.GeneratingBase ||
+                     progress.state == GenerationState.Completed)) {
+                    lastWakeTriggerTime = 0L
+                }
+
                 val currentEnhancedPrompt = activeJob?.progress?.enhancedPrompt
                 val mergedProgress = progress.copy(
                     enhancedPrompt = currentEnhancedPrompt ?: progress.enhancedPrompt
@@ -189,7 +203,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     progress.state == GenerationState.Cancelled) {
                     
                     if (progress.state == GenerationState.Failed) {
-                        val currentSettings = activeJob?.settings ?: _settings.value
                         if (currentSettings.triggerCmdEnabled && 
                             currentSettings.hostType == com.example.comfyprompt.data.HostType.LOCAL &&
                             progress.statusText.contains("Connection error", ignoreCase = true)) {
@@ -197,7 +210,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             val now = System.currentTimeMillis()
                             if (now - lastWakeTriggerTime > 5 * 60 * 1000) {
                                 lastWakeTriggerTime = now
-                                triggerAutoWakeAndPoll(currentSettings)
+                                startWakeSequence(currentSettings)
                             }
                         }
                     }
@@ -774,18 +787,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun triggerAutoWakeAndPoll(settings: AppSettings) {
-        viewModelScope.launch {
-            // Show user a toast indicating server is offline and wake is triggered
-            withContext(Dispatchers.Main) {
-                android.widget.Toast.makeText(
-                    getApplication(),
-                    "Local server offline. Sent wake signal to TRIGGERcmd!",
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-            }
+    fun getLastWakeTriggerTime(): Long = lastWakeTriggerTime
 
-            AppLogger.i("MainViewModel", "Triggering TRIGGERcmd auto-wake call...")
+    fun resetWakeState() {
+        _serverWakeState.value = ServerWakeState.Idle
+    }
+
+    fun cancelWakeSequence() {
+        isPollingActive = false
+        _serverWakeState.value = ServerWakeState.Idle
+    }
+
+    fun startWakeSequence(settings: AppSettings) {
+        viewModelScope.launch {
+            _serverWakeState.value = ServerWakeState.Waking
+            AppLogger.i("MainViewModel", "ServerWake: Triggering TRIGGERcmd wake call...")
             val success = com.example.comfyprompt.network.TriggerCmdClient.wakeServer(
                 token = settings.triggerCmdToken,
                 trigger = settings.triggerCmdName,
@@ -793,30 +809,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             if (success) {
-                // Check if we already have a polling job running
+                _serverWakeState.value = ServerWakeState.Polling
                 if (isPollingActive) {
-                    AppLogger.d("MainViewModel", "Polling loop is already active. Skipping duplicate spawn.")
+                    AppLogger.d("MainViewModel", "ServerWake: Polling loop is already active. Skipping duplicate spawn.")
                     return@launch
                 }
 
                 viewModelScope.launch(Dispatchers.IO) {
                     isPollingActive = true
-                    AppLogger.i("MainViewModel", "TRIGGERcmd woke successfully! Starting ComfyUI server polling loop...")
+                    AppLogger.i("MainViewModel", "ServerWake: Starting ComfyUI server polling loop...")
                     var serverUp = false
                     val startPollTime = System.currentTimeMillis()
-                    // Poll for up to 5 minutes
                     while (System.currentTimeMillis() - startPollTime < 5 * 60 * 1000) {
                         if (!isPollingActive) break
                         if (com.example.comfyprompt.network.TriggerCmdClient.pollLocalServer(settings.serverUrl)) {
                             serverUp = true
                             break
                         }
-                        kotlinx.coroutines.delay(5000) // Poll every 5 seconds
+                        kotlinx.coroutines.delay(5000)
                     }
 
                     if (serverUp) {
-                        AppLogger.i("MainViewModel", "ComfyUI server is confirmed online! Sending ready notification...")
-                        sendLocalServerReadyNotification()
+                        AppLogger.i("MainViewModel", "ServerWake: ComfyUI server is online!")
+                        lastWakeTriggerTime = 0L
+                        _serverWakeState.value = ServerWakeState.Success
+
+                        if (!com.example.comfyprompt.MainActivity.isAppInForeground) {
+                            sendLocalServerReadyNotification()
+                        }
+
                         withContext(Dispatchers.Main) {
                             android.widget.Toast.makeText(
                                 getApplication(),
@@ -825,10 +846,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             ).show()
                         }
                     } else {
-                        AppLogger.w("MainViewModel", "ComfyUI server polling timed out after 5 minutes.")
+                        AppLogger.w("MainViewModel", "ServerWake: Polling timed out.")
+                        if (isPollingActive) {
+                            _serverWakeState.value = ServerWakeState.Timeout("Local ComfyUI server failed to respond within 5 minutes.")
+                        }
                     }
                     isPollingActive = false
                 }
+            } else {
+                _serverWakeState.value = ServerWakeState.Timeout("TRIGGERcmd failed to trigger. Please check your token and trigger config.")
             }
         }
     }
@@ -848,8 +874,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val title = "ComfyUI Server Ready! ✨"
-        val text = "Your local ComfyUI server is online and ready for generations."
+        val title = "Found Server! ✨"
+        val text = "Your local ComfyUI server is online and ready."
 
         val intent = Intent(context, com.example.comfyprompt.MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP

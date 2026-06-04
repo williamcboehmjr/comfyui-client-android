@@ -20,6 +20,14 @@ enum class GenerationState {
     Cancelled
 }
 
+sealed class ServerWakeState {
+    object Idle : ServerWakeState()
+    object Waking : ServerWakeState()
+    object Polling : ServerWakeState()
+    object Success : ServerWakeState()
+    data class Timeout(val message: String) : ServerWakeState()
+}
+
 data class AppSettings(
     val serverUrl: String = "http://10.0.2.2:8188",
     val geminiApiKey: String = "",

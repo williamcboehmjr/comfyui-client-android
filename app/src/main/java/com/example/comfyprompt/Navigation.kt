@@ -23,6 +23,7 @@ import com.example.comfyprompt.ui.screens.ResultScreen
 import com.example.comfyprompt.ui.screens.SettingsScreen
 import com.example.comfyprompt.ui.screens.GalleryScreen
 import com.example.comfyprompt.ui.screens.LogsScreen
+import com.example.comfyprompt.ui.screens.ServerWakeScreen
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +40,35 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
     val activeJobId by viewModel.activeJobId.collectAsState()
     var showBottomSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
+
+    val wakeState by viewModel.serverWakeState.collectAsState()
+
+    // Monitor wake state to navigate to/from ServerWakeScreen
+    LaunchedEffect(wakeState) {
+        val currentScreen = backStack.lastOrNull()
+        when (wakeState) {
+            is com.example.comfyprompt.data.ServerWakeState.Waking,
+            is com.example.comfyprompt.data.ServerWakeState.Polling -> {
+                if (currentScreen !is ServerWake) {
+                    backStack.add(ServerWake)
+                }
+            }
+            is com.example.comfyprompt.data.ServerWakeState.Success -> {
+                if (currentScreen is ServerWake) {
+                    backStack.removeLastOrNull()
+                    viewModel.resetWakeState()
+                }
+            }
+            is com.example.comfyprompt.data.ServerWakeState.Timeout -> {
+                // Keep it on screen so they can read the error and click OK/DISMISS
+            }
+            is com.example.comfyprompt.data.ServerWakeState.Idle -> {
+                if (currentScreen is ServerWake) {
+                    backStack.removeLastOrNull()
+                }
+            }
+        }
+    }
 
     // Monitor active generation flow to auto-navigate
     LaunchedEffect(progressInfo.state) {
@@ -61,7 +91,13 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
             }
             GenerationState.Failed -> {
                 if (currentScreen is Progress) {
-                    Toast.makeText(context, progressInfo.statusText, Toast.LENGTH_LONG).show()
+                    val isTriggerCmdEnabled = settings.triggerCmdEnabled && 
+                            settings.hostType == com.example.comfyprompt.data.HostType.LOCAL &&
+                            progressInfo.statusText.contains("Connection error", ignoreCase = true)
+                    
+                    if (!isTriggerCmdEnabled) {
+                        Toast.makeText(context, progressInfo.statusText, Toast.LENGTH_LONG).show()
+                    }
                     backStack.removeLastOrNull() // Go back from Progress
                     viewModel.resetState()
                 }
@@ -198,6 +234,15 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                         onDownloadClick = { url -> viewModel.saveImageToDownloads(url, settings.outputFormat) },
                         onRefinePromptClick = { imageUrl, seed ->
                             backStack.add(Result(imageUrl, seed))
+                        }
+                    )
+                }
+                entry<ServerWake> {
+                    ServerWakeScreen(
+                        wakeState = wakeState,
+                        settings = settings,
+                        onCancelClick = {
+                            viewModel.cancelWakeSequence()
                         }
                     )
                 }
