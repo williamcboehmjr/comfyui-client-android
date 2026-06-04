@@ -53,6 +53,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     private var lastWakeTriggerTime: Long = 0L
+    @kotlin.jvm.Volatile
     private var isPollingActive: Boolean = false
 
     private val _queueList = MutableStateFlow<List<com.example.comfyprompt.data.QueueJob>>(emptyList())
@@ -816,6 +817,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (serverUp) {
                         AppLogger.i("MainViewModel", "ComfyUI server is confirmed online! Sending ready notification...")
                         sendLocalServerReadyNotification()
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                getApplication(),
+                                "ComfyUI Server is online and ready! ✨",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
                     } else {
                         AppLogger.w("MainViewModel", "ComfyUI server polling timed out after 5 minutes.")
                     }

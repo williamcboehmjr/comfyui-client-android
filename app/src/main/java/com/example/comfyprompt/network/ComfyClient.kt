@@ -446,7 +446,7 @@ object ComfyClient {
                 AppLogger.e("ComfyClient", "Error during generation")
                 progressFlow.value = ProgressInfo(
                     state = GenerationState.Failed,
-                    statusText = "Connection error: ${e.localizedMessage}"
+                    statusText = "Connection error to ${settings.serverUrl}: ${e.localizedMessage}"
                 )
             }
         }
@@ -505,7 +505,7 @@ object ComfyClient {
             AppLogger.e("ComfyClient", "Exception during execution of local generation")
             progressFlow.value = ProgressInfo(
                 state = GenerationState.Failed,
-                statusText = "Connection error: ${e.localizedMessage}"
+                statusText = "Connection error to ${settings.serverUrl}: ${e.localizedMessage}"
             )
         }
     }

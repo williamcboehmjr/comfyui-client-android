@@ -69,8 +69,8 @@ object TriggerCmdClient {
     }
 
     suspend fun pollLocalServer(serverUrl: String): Boolean = withContext(Dispatchers.IO) {
+        val cleanUrl = serverUrl.removeSuffix("/")
         try {
-            val cleanUrl = serverUrl.removeSuffix("/")
             // ComfyUI system check or main page ping
             val request = Request.Builder()
                 .url(cleanUrl)
@@ -83,7 +83,7 @@ object TriggerCmdClient {
                 return@withContext true
             }
         } catch (e: Exception) {
-            AppLogger.d("TriggerCmdClient", "Ping local server failed (normal if booting): ${e.localizedMessage}")
+            AppLogger.d("TriggerCmdClient", "Ping local server failed to connect to $cleanUrl (normal if booting): ${e.localizedMessage}")
         }
         return@withContext false
     }
