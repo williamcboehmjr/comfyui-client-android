@@ -26,7 +26,11 @@ object TriggerCmdClient {
         .build()
 
     suspend fun wakeServer(token: String, trigger: String, computer: String): Boolean = withContext(Dispatchers.IO) {
-        if (token.isBlank()) {
+        val cleanToken = token.trim()
+        val cleanTrigger = trigger.trim()
+        val cleanComputer = computer.trim()
+
+        if (cleanToken.isBlank()) {
             AppLogger.e("TriggerCmdClient", "Cannot trigger wake: Token is empty")
             return@withContext false
         }
@@ -34,20 +38,20 @@ object TriggerCmdClient {
         try {
             val url = "https://www.triggercmd.com/api/run/trigger"
             val bodyObj = JsonObject().apply {
-                addProperty("trigger", trigger)
-                if (computer.isNotBlank()) {
-                    addProperty("computer", computer)
+                addProperty("trigger", cleanTrigger)
+                if (cleanComputer.isNotBlank()) {
+                    addProperty("computer", cleanComputer)
                 }
             }
             val requestBody = bodyObj.toString().toRequestBody(mediaType)
 
             val request = Request.Builder()
                 .url(url)
-                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Authorization", "Bearer $cleanToken")
                 .post(requestBody)
                 .build()
 
-            AppLogger.d("TriggerCmdClient", "Sending TRIGGERcmd wake call for trigger: $trigger on computer: $computer")
+            AppLogger.d("TriggerCmdClient", "Sending TRIGGERcmd wake call for trigger: $cleanTrigger on computer: $cleanComputer")
             wakeClient.newCall(request).execute().use { response ->
                 val bodyStr = response.body?.string() ?: ""
                 AppLogger.d("TriggerCmdClient", "RESPONSE: ${response.code} -> $bodyStr")
