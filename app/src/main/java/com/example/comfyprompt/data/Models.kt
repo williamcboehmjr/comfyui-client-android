@@ -24,6 +24,7 @@ sealed class ServerWakeState {
     object Idle : ServerWakeState()
     object Waking : ServerWakeState()
     object Polling : ServerWakeState()
+    object HostUnreachable : ServerWakeState()
     object Success : ServerWakeState()
     data class Timeout(val message: String) : ServerWakeState()
 }

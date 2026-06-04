@@ -454,6 +454,17 @@ object ComfyClient {
 
     internal suspend fun executeLocalGeneration(promptJson: String, settings: AppSettings) = withContext(Dispatchers.IO) {
         try {
+            // Quick check before starting connection
+            val pingResult = TriggerCmdClient.pollLocalServer(settings.serverUrl)
+            if (pingResult != PingResult.ONLINE) {
+                val detail = if (pingResult == PingResult.HOST_UNREACHABLE) {
+                    "Host unreachable. Make sure you are on the same network."
+                } else {
+                    "ComfyUI server is offline."
+                }
+                throw java.net.ConnectException("Connection failed: $detail")
+            }
+
             connectWebSocket(settings.serverUrl)
 
             val serverBaseUrl = settings.serverUrl.removeSuffix("/")

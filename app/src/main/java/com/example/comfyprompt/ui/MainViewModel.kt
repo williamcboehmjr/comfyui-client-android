@@ -811,6 +811,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startWakeSequence(settings: AppSettings) {
+        val currentState = _serverWakeState.value
+        if (currentState is ServerWakeState.Waking || 
+            currentState is ServerWakeState.Polling || 
+            currentState is ServerWakeState.HostUnreachable ||
+            isPollingActive) {
+            AppLogger.d("MainViewModel", "ServerWake: Wake or polling is already in progress. Skipping duplicate trigger.")
+            return
+        }
+
         viewModelScope.launch {
             _serverWakeState.value = ServerWakeState.Waking
             AppLogger.i("MainViewModel", "ServerWake: Triggering TRIGGERcmd wake call...")
@@ -844,10 +853,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val startPollTime = System.currentTimeMillis()
                     while (System.currentTimeMillis() - startPollTime < 5 * 60 * 1000) {
                         if (!isPollingActive) break
-                        if (com.example.comfyprompt.network.TriggerCmdClient.pollLocalServer(settings.serverUrl)) {
+                        val result = com.example.comfyprompt.network.TriggerCmdClient.pollLocalServer(settings.serverUrl)
+                        if (result == com.example.comfyprompt.network.PingResult.ONLINE) {
                             serverUp = true
                             break
                         }
+                        
+                        if (result == com.example.comfyprompt.network.PingResult.HOST_UNREACHABLE) {
+                            _serverWakeState.value = ServerWakeState.HostUnreachable
+                        } else {
+                            _serverWakeState.value = ServerWakeState.Polling
+                        }
+                        
                         kotlinx.coroutines.delay(5000)
                     }
 

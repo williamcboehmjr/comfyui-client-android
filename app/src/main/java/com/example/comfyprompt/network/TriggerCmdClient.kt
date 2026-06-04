@@ -9,6 +9,12 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+enum class PingResult {
+    ONLINE,
+    HOST_ALIVE_SERVER_DOWN,
+    HOST_UNREACHABLE
+}
+
 object TriggerCmdClient {
     private val mediaType = "application/json; charset=utf-8".toMediaType()
     
@@ -68,7 +74,7 @@ object TriggerCmdClient {
         return@withContext false
     }
 
-    suspend fun pollLocalServer(serverUrl: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun pollLocalServer(serverUrl: String): PingResult = withContext(Dispatchers.IO) {
         val cleanUrl = serverUrl.removeSuffix("/")
         try {
             // ComfyUI system check or main page ping
@@ -78,13 +84,19 @@ object TriggerCmdClient {
                 .build()
 
             pingClient.newCall(request).execute().use { response ->
-                // If ComfyUI responds with any code, it is online
                 AppLogger.d("TriggerCmdClient", "Ping ComfyUI returned code: ${response.code}")
-                return@withContext true
+                return@withContext PingResult.ONLINE
             }
         } catch (e: Exception) {
-            AppLogger.d("TriggerCmdClient", "Ping local server failed to connect to $cleanUrl (normal if booting): ${e.localizedMessage}")
+            val msg = e.localizedMessage ?: ""
+            AppLogger.d("TriggerCmdClient", "Ping local server failed to connect to $cleanUrl (normal if booting): $msg")
+            val isRefused = msg.contains("refused", ignoreCase = true) || 
+                            msg.contains("Connection refused", ignoreCase = true)
+            if (isRefused) {
+                return@withContext PingResult.HOST_ALIVE_SERVER_DOWN
+            } else {
+                return@withContext PingResult.HOST_UNREACHABLE
+            }
         }
-        return@withContext false
     }
 }

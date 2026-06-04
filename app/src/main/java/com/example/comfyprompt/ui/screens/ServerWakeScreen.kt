@@ -120,6 +120,7 @@ fun ServerWakeScreen(
             val statusHeader = when (wakeState) {
                 is ServerWakeState.Waking -> "Waking ComfyUI Server..."
                 is ServerWakeState.Polling -> "Waiting for ComfyUI to load... ⏳"
+                is ServerWakeState.HostUnreachable -> "Local IP Unreachable ⚠️"
                 is ServerWakeState.Success -> "Server Found! ✨"
                 is ServerWakeState.Timeout -> "Wake Timeout"
                 else -> "Offline Check"
@@ -142,6 +143,9 @@ fun ServerWakeScreen(
                 }
                 is ServerWakeState.Polling -> {
                     "Pinging local server at:\n${settings.serverUrl}\n\nIt can take up to 2-3 minutes for the server shell/process to finish booting up."
+                }
+                is ServerWakeState.HostUnreachable -> {
+                    "Local IP is not available.\n\nMake sure your ComfyUI computer is turned on and that you are connected to the same local Wi-Fi/Ethernet network."
                 }
                 is ServerWakeState.Success -> {
                     "Your ComfyUI server is successfully online and ready!"
@@ -179,8 +183,13 @@ fun ServerWakeScreen(
             shape = RoundedCornerShape(28.dp),
             border = borderStroke()
         ) {
+            val buttonText = when (wakeState) {
+                is ServerWakeState.Timeout,
+                is ServerWakeState.HostUnreachable -> "DISMISS"
+                else -> "CANCEL WAKE"
+            }
             Text(
-                text = if (wakeState is ServerWakeState.Timeout) "DISMISS" else "CANCEL WAKE",
+                text = buttonText,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             )

@@ -48,7 +48,8 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
         val currentScreen = backStack.lastOrNull()
         when (wakeState) {
             is com.example.comfyprompt.data.ServerWakeState.Waking,
-            is com.example.comfyprompt.data.ServerWakeState.Polling -> {
+            is com.example.comfyprompt.data.ServerWakeState.Polling,
+            is com.example.comfyprompt.data.ServerWakeState.HostUnreachable -> {
                 if (currentScreen !is ServerWake) {
                     backStack.add(ServerWake)
                 }
