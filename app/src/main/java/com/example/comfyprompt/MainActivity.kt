@@ -16,6 +16,10 @@ import androidx.core.content.ContextCompat
 import com.example.comfyprompt.theme.ComfyPromptTheme
 
 class MainActivity : ComponentActivity() {
+    private val viewModel by lazy {
+        androidx.lifecycle.ViewModelProvider(this)[com.example.comfyprompt.ui.MainViewModel::class.java]
+    }
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -37,7 +41,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainNavigation()
+                    MainNavigation(viewModel = viewModel)
                 }
             }
         }
@@ -58,11 +62,13 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         isAppInForeground = true
+        viewModel.onAppForegrounded()
     }
 
     override fun onStop() {
         super.onStop()
         isAppInForeground = false
+        viewModel.onAppBackgrounded()
     }
 
     companion object {

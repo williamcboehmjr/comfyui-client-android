@@ -791,11 +791,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetWakeState() {
         _serverWakeState.value = ServerWakeState.Idle
+        dismissPersistentWakeNotification()
     }
 
     fun cancelWakeSequence() {
         isPollingActive = false
         _serverWakeState.value = ServerWakeState.Idle
+        dismissPersistentWakeNotification()
     }
 
     fun isConnectionError(statusText: String): Boolean {
@@ -812,6 +814,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _serverWakeState.value = ServerWakeState.Waking
             AppLogger.i("MainViewModel", "ServerWake: Triggering TRIGGERcmd wake call...")
+            
+            if (!com.example.comfyprompt.MainActivity.isAppInForeground) {
+                sendPersistentWakeNotification(ServerWakeState.Waking)
+            }
+
             val success = com.example.comfyprompt.network.TriggerCmdClient.wakeServer(
                 token = settings.triggerCmdToken,
                 trigger = settings.triggerCmdName,
@@ -820,6 +827,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             if (success) {
                 _serverWakeState.value = ServerWakeState.Polling
+                
+                if (!com.example.comfyprompt.MainActivity.isAppInForeground) {
+                    sendPersistentWakeNotification(ServerWakeState.Polling)
+                }
+
                 if (isPollingActive) {
                     AppLogger.d("MainViewModel", "ServerWake: Polling loop is already active. Skipping duplicate spawn.")
                     return@launch
@@ -843,6 +855,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         AppLogger.i("MainViewModel", "ServerWake: ComfyUI server is online!")
                         lastWakeTriggerTime = 0L
                         _serverWakeState.value = ServerWakeState.Success
+                        dismissPersistentWakeNotification()
 
                         if (!com.example.comfyprompt.MainActivity.isAppInForeground) {
                             sendLocalServerReadyNotification()
@@ -857,6 +870,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     } else {
                         AppLogger.w("MainViewModel", "ServerWake: Polling timed out.")
+                        dismissPersistentWakeNotification()
                         if (isPollingActive) {
                             _serverWakeState.value = ServerWakeState.Timeout("Local ComfyUI server failed to respond within 5 minutes.")
                         }
@@ -865,8 +879,69 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } else {
                 _serverWakeState.value = ServerWakeState.Timeout("TRIGGERcmd failed to trigger. Please check your token and trigger config.")
+                dismissPersistentWakeNotification()
             }
         }
+    }
+
+    private val PERSISTENT_WAKE_NOTIFICATION_ID = 9999
+
+    fun onAppBackgrounded() {
+        val state = _serverWakeState.value
+        if (state is ServerWakeState.Waking || state is ServerWakeState.Polling) {
+            sendPersistentWakeNotification(state)
+        }
+    }
+
+    fun onAppForegrounded() {
+        dismissPersistentWakeNotification()
+    }
+
+    private fun sendPersistentWakeNotification(state: ServerWakeState) {
+        val context = getApplication<Application>()
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "comfyui_notifications",
+                "Image Generation Status",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val title = "Waiting for ComfyUI to load... ⏳"
+        val text = when (state) {
+            is ServerWakeState.Waking -> "Waking local server via TRIGGERcmd..."
+            else -> "Pinging server at ${_settings.value.serverUrl}..."
+        }
+
+        val intent = Intent(context, com.example.comfyprompt.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = androidx.core.app.NotificationCompat.Builder(context, "comfyui_notifications")
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notificationManager.notify(PERSISTENT_WAKE_NOTIFICATION_ID, notification)
+    }
+
+    private fun dismissPersistentWakeNotification() {
+        val context = getApplication<Application>()
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        notificationManager.cancel(PERSISTENT_WAKE_NOTIFICATION_ID)
     }
 
     private fun sendLocalServerReadyNotification() {
