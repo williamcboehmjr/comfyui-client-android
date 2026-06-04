@@ -719,7 +719,7 @@ object ComfyClient {
         activeWebSocket = null
     }
 
-    private fun calculateDimensions(megapixel: String, aspectRatio: String, divisibleBy: Int = 16): Pair<Int, Int> {
+    internal fun calculateDimensions(megapixel: String, aspectRatio: String, divisibleBy: Int = 16): Pair<Int, Int> {
         val mp = megapixel.toDoubleOrNull() ?: 1.0
         val totalPixels = mp * 1000000.0
 
@@ -779,7 +779,7 @@ object ComfyClient {
         }
     }
 
-    private fun isPositivePrompt(text: String): Boolean {
+    internal fun isPositivePrompt(text: String): Boolean {
         val lower = text.lowercase()
         val negativeKeywords = listOf(
             "bad", "blurry", "lowres", "worst", "quality", "deformed", "watermark", 
