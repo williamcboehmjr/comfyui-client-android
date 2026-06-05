@@ -216,8 +216,14 @@ fun QueueBottomSheetContent(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
+                                val cleanStatus = activeJob.progress.statusText.substringBefore(" (").ifBlank { "Initializing..." }
+                                val progressText = if (activeJob.progress.percent > 0) {
+                                    "$cleanStatus (${(activeJob.progress.percent * 100).toInt()}%)"
+                                } else {
+                                    cleanStatus
+                                }
                                 Text(
-                                    text = activeJob.progress.statusText.ifBlank { "Initializing..." },
+                                    text = progressText,
                                     fontSize = 13.sp,
                                     color = LightGray
                                 )

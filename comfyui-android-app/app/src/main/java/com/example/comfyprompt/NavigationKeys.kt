@@ -9,4 +9,5 @@ import kotlinx.serialization.Serializable
 @Serializable data object Settings : NavKey
 @Serializable data object Gallery : NavKey
 @Serializable data object Logs : NavKey
+@Serializable data object ServerWake : NavKey
 

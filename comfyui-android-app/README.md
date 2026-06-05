@@ -3,6 +3,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-purple.svg)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack-Compose-blue.svg)](https://developer.android.com/jetpack/compose)
+[![Version](https://img.shields.io/badge/Version-1.2.0-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **ComfyUI Client** is a fully native Android application designed to interface with your ComfyUI server. 
@@ -62,20 +63,26 @@ Enjoy premium large screen partitioning:
 *   **Direct-to-Host Stream**: Integrates seamlessly with your server's REST API and WebSockets for instantaneous response.
 *   **Real-time Event Subscriptions**: Subscribes directly to ComfyUI execution events to show actual progress bars and detailed status updates.
 *   **Zero Credentials Hardcoded**: All keys and credentials (such as Gemini, Grok, ChatGPT, or Claude prompt-enhancing keys) are stored securely on-device using local encrypted storage and are never committed to code.
+*   **Background-Resilient Generation**: Generation state is owned by a `GenerationRepository` running on a `SupervisorJob` scope, so backgrounding or rotating the device does not drop the active WebSocket connection or lose progress.
 
 ### 🧠 Dynamic UI-to-API Workflow Engine
 *   **Universal Graph Conversion**: Automatically transforms ComfyUI "UI-format" JSON workflows (nodes + links) into the optimized "API-format" structure required for direct server execution.
 *   **Positional Input Alignment**: Dynamically parses the host server's `/object_info` definitions to correctly map connection slots vs widget inputs for custom nodes, eliminating index-shifting and broken parameter assignments.
 *   **Dangling Node Recovery & Fallback**: Automatically cleans up links pointing to unsupported custom UI-only nodes while safely mapping default properties (like prompts or values) from `/object_info` definitions, ensuring that missing nodes do not break generation.
 *   **Natively Calculated Resolution Injection**: Dynamically intercepts latent/image generators and injects native, aspect-ratio-friendly resolutions calculated directly on your device.
+*   **`WorkflowTransformer`**: Prompt injection is handled by a dedicated transformer that recursively walks the graph to find `CLIPTextEncode` and `PrimitiveNode` targets — no more brittle index assumptions.
 
 ### 🖼️ Seamless Mobile UX
 *   **Prompt Enhancer Integration**: Features built-in AI adapters (supporting Gemini, ChatGPT, Claude, Grok, and local/custom OpenAI-compatible endpoints) to expand simple input prompts into beautiful visual styles.
-*   **Vision-Powered Refiner Chat**: Transient, fully in-RAM vision dialog utilizing background Gemini 3.5 Flash. Upload gallery reference photos, dictate prompts with local microphone input, and review side-by-side prompt suggestions.
+*   **Collapsible Enhanced-Prompt Card**: On the Progress Screen, the AI-enhanced prompt starts collapsed to a 3-line tappable preview. Tap to smoothly expand the full text and tap again to collapse — keeping generation progress always visible without scrolling.
+*   **Vision-Powered Refiner Chat**: Transient, fully in-RAM vision dialog utilizing background Gemini Flash. Upload gallery reference photos, dictate prompts with local microphone input, and review side-by-side prompt suggestions.
 *   **Interactive Creations Refinery**: Click any previous output in the Gallery to instantly reload or refine the prompt with vision chat overlays.
 *   **Granular Multi-Job Queue**: Floating Queue FAB showing active generation counts with detailed bottom sheet split action controls: "Clear Queue" (clears pending jobs, leaving the active one intact) and "Stop All" (aborts current generation and empties the queue).
 *   **Dynamic Gallery & Viewer**: Stores generation history locally with high-performance caching. Tap any item to view in full-screen, or instantly invoke native Android Share and Download operations.
 *   **Settings Suite**: Easily configure host URL, megapixels, desired aspect ratios, and model specifications.
+
+### 🌐 Smart Server Wake (TRIGGERcmd)
+*   **Auto-Wake on Connection Failure**: If the local ComfyUI host is unreachable, the app can optionally fire a TRIGGERcmd cloud relay command to power on your server, then poll until it's back online before proceeding — no manual intervention required.
 
 ---
 
@@ -134,15 +141,20 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 ## 🔮 Feature Roadmap & Milestones
 
-We are molding this client into the ultimate mobile generative experience. Here is what we have accomplished and what is coming next:
+We are molding this client into the ultimate mobile generative experience. Here is what we have accomplished and what is coming next.
 
-### 🚀 Recently Completed Features
+See the full [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
+### 🚀 Recently Completed Features (v1.2.0)
+*   **Modular Screen Architecture**: Refactored from a monolithic `Screens.kt` into individual focused screen files for much better maintainability.
+*   **Background-Resilient Generation**: `GenerationRepository` owns generation state so backgrounding or rotating the device no longer drops the WebSocket stream.
+*   **Collapsible AI Prompt Card**: On the Progress Screen, the enhanced prompt collapses to a tappable 3-line preview — tap to expand or collapse with smooth animation.
+*   **TRIGGERcmd Server Wake**: Auto-wake your ComfyUI PC via TRIGGERcmd when it's unreachable, with polling until it's back online.
+*   **Fixed Double-Percentage Notifications** (`35% 35%` → `35%`): Sanitized all progress-string update paths.
 *   **Cloud Host Integrations**: Orchestration with serverless and GPU providers (including **RunPod Serverless**, **Fal.ai**, and **ComfyDeploy**) with smart local fallback logic.
 *   **Active Job Queue Management**: Stop, abort, and clear controls via the Floating Queue FAB bottom sheets (Clear Queue vs. Stop All).
-*   **Mobile-Optimized Tweaks**: Native UI panels on the main prompter screen for adjusting seed parameters, resolutions, and aspect ratios directly from simple cards.
-*   **Cryptographically Secure API Storage**: Storage of all active model keys (Gemini, ChatGPT, Claude, Grok, etc.) using Android's native `EncryptedSharedPreferences` sandbox.
-*   **Request Rate Limiting**: Built-in 5-second generator cooldown trigger to prevent duplicate generation fires and local server rate limit errors.
-*   **Universal Graph-to-API Engine**: Position-aligned node widget mapping and dangling link recovery to translate raw "UI-format" JSON workflows into server-ready "API-format" payloads.
+*   **Cryptographically Secure API Storage**: All active model keys stored using Android's native `EncryptedSharedPreferences` (AES-256 GCM).
+*   **Universal Graph-to-API Engine**: Position-aligned node widget mapping and dangling link recovery.
 
 ### 🔮 Planned Next Steps
 *   **Toggle Groups**: Support for toggling LiteGraph groups directly from the Android app UI to enable/disable entire workflow segments.
