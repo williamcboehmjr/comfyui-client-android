@@ -26,8 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.comfyprompt.data.AppSettings
 import com.example.comfyprompt.theme.AccentGray
-import com.example.comfyprompt.theme.CardGray
-import com.example.comfyprompt.theme.DarkGray
 import com.example.comfyprompt.theme.SuccessGreen
 
 @Composable
@@ -91,7 +89,7 @@ fun ResultScreen(
                 .fillMaxWidth()
                 .height(56.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.Black
             ),
             shape = RoundedCornerShape(28.dp)
@@ -135,7 +133,7 @@ fun ResultScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(20.dp))
-                .background(CardGray),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             ZoomableImage(
@@ -153,7 +151,7 @@ fun ResultScreen(
         }
 
         Scaffold(
-            containerColor = Color.Black
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             if (isExpandedScreen) {
                 // Expanded landscape screen
@@ -208,7 +206,7 @@ fun ResultScreen(
                                     Button(
                                         onClick = onSaveClick,
                                         modifier = Modifier.fillMaxSize(),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
                                         shape = RoundedCornerShape(25.dp),
                                         contentPadding = PaddingValues(0.dp)
                                     ) {

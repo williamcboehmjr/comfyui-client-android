@@ -36,9 +36,6 @@ import coil.compose.AsyncImage
 import com.example.comfyprompt.data.GalleryItem
 import com.example.comfyprompt.theme.AccentGray
 import com.example.comfyprompt.theme.AccentRed
-import com.example.comfyprompt.theme.CardGray
-import com.example.comfyprompt.theme.DarkGray
-import com.example.comfyprompt.theme.LightGray
 import com.example.comfyprompt.theme.SuccessGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,10 +69,10 @@ fun GalleryScreen(
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
                 )
             },
-            containerColor = Color.Black
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             if (items.isEmpty()) {
                 Box(
@@ -89,7 +86,7 @@ fun GalleryScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.Image, contentDescription = "Empty History", tint = AccentGray, modifier = Modifier.size(64.dp))
-                        Text("No past creations found.", color = LightGray, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text("No past creations found.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         Text("Your successful generations will appear here.", color = AccentGray, fontSize = 13.sp)
                     }
                 }
@@ -108,7 +105,7 @@ fun GalleryScreen(
                             modifier = Modifier
                                 .aspectRatio(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(CardGray)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
                                 .clickable { selectedItem = item }
                         ) {
                             AsyncImage(
@@ -143,7 +140,7 @@ fun GalleryScreen(
                             .fillMaxWidth(if (isExpandedScreen) 0.8f else 0.95f)
                             .fillMaxHeight(if (isExpandedScreen) 0.85f else 0.92f)
                             .clickable(enabled = false) {}, // Prevent clicks closing card
-                        colors = CardDefaults.cardColors(containerColor = CardGray),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                         shape = RoundedCornerShape(20.dp)
                     ) {
                         Column(
@@ -178,7 +175,7 @@ fun GalleryScreen(
                                             .weight(1.2f)
                                             .fillMaxHeight()
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(DarkGray)
+                                            .background(MaterialTheme.colorScheme.surface)
                                             .clickable { isFullScreen = true },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -214,7 +211,7 @@ fun GalleryScreen(
                                             .fillMaxWidth()
                                             .height(260.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(DarkGray)
+                                            .background(MaterialTheme.colorScheme.surface)
                                             .clickable { isFullScreen = true },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -279,7 +276,7 @@ fun GalleryScreen(
                                             onReRunClick(item.prompt)
                                             selectedItem = null
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
                                         shape = RoundedCornerShape(20.dp),
                                         modifier = Modifier.weight(1.2f)
                                     ) {
@@ -319,7 +316,7 @@ fun GalleryScreen(
                                                     onReRunClick(item.prompt)
                                                     selectedItem = null
                                                 },
-                                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
                                                 shape = RoundedCornerShape(20.dp),
                                                 modifier = Modifier.weight(1f)
                                             ) {
@@ -348,7 +345,7 @@ fun GalleryScreen(
                                                 onReRunClick(item.prompt)
                                                 selectedItem = null
                                             },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
                                             shape = RoundedCornerShape(20.dp),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
@@ -443,7 +440,7 @@ fun GalleryDetailsContent(
 ) {
     // Original prompt
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkGray),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -472,7 +469,7 @@ fun GalleryDetailsContent(
     // Enhanced prompt if present
     if (item.enhancedPrompt != null && item.enhancedPrompt != item.prompt) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkGray),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -494,7 +491,7 @@ fun GalleryDetailsContent(
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(item.enhancedPrompt, fontSize = 12.sp, color = LightGray)
+                Text(item.enhancedPrompt, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -38,9 +38,6 @@ import com.example.comfyprompt.network.UrlValidator
 import com.example.comfyprompt.network.ValidationResult
 import com.example.comfyprompt.theme.AccentGray
 import com.example.comfyprompt.theme.AccentRed
-import com.example.comfyprompt.theme.CardGray
-import com.example.comfyprompt.theme.DarkGray
-import com.example.comfyprompt.theme.LightGray
 import com.example.comfyprompt.theme.SuccessGreen
 import com.example.comfyprompt.ui.ImportState
 
@@ -158,10 +155,10 @@ fun SettingsScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -174,7 +171,7 @@ fun SettingsScreen(
             // Host Connection Configuration Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -193,7 +190,7 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .border(1.dp, AccentGray, RoundedCornerShape(8.dp))
                                 .clickable { hostTypeDropdownExpanded = true }
                                 .padding(16.dp)
@@ -219,7 +216,7 @@ fun SettingsScreen(
                             DropdownMenu(
                                 expanded = hostTypeDropdownExpanded,
                                 onDismissRequest = { hostTypeDropdownExpanded = false },
-                                modifier = Modifier.background(CardGray)
+                                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 HostType.entries.forEach { type ->
                                     val label = when (type) {
@@ -481,7 +478,7 @@ fun SettingsScreen(
             // Workflow to Use Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -529,7 +526,7 @@ fun SettingsScreen(
                             onDismissRequest = { workflowDropdownExpanded = false },
                             modifier = Modifier
                                 .fillMaxWidth(0.85f)
-                                .background(CardGray)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Built-in Ernie Workflow (Default)", color = Color.White) },
@@ -598,7 +595,7 @@ fun SettingsScreen(
             // ComfyUI Workflow Export Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -611,14 +608,14 @@ fun SettingsScreen(
                     Text(
                         "Download the cleaned ERNIE 1-stage workflow.json. Drag and drop it on ComfyUI to automatically install and link any required custom nodes.",
                         fontSize = 13.sp,
-                        color = LightGray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = onDownloadWorkflowClick,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
+                            containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = Color.Black
                         ),
                         shape = RoundedCornerShape(24.dp)
@@ -631,7 +628,7 @@ fun SettingsScreen(
             // Prompt Enhancer Settings Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -650,7 +647,7 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .border(1.dp, AccentGray, RoundedCornerShape(8.dp))
                                 .clickable { providerDropdownExpanded = true }
                                 .padding(16.dp)
@@ -659,7 +656,7 @@ fun SettingsScreen(
                             DropdownMenu(
                                 expanded = providerDropdownExpanded,
                                 onDismissRequest = { providerDropdownExpanded = false },
-                                modifier = Modifier.background(CardGray)
+                                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 providers.forEach { prov ->
                                     DropdownMenuItem(
@@ -674,7 +671,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    HorizontalDivider(color = DarkGray, thickness = 1.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surface, thickness = 1.dp)
 
                     if (apiProvider == "Local / Custom") {
                         Column {
@@ -695,7 +692,7 @@ fun SettingsScreen(
                                 )
                                 Button(
                                     onClick = { onFetchLocalModelsClick(localLlmBaseUrl) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text("Fetch Models", fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -796,7 +793,7 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .border(1.dp, AccentGray, RoundedCornerShape(8.dp))
                                 .clickable { modelDropdownExpanded = true }
                                 .padding(16.dp)
@@ -805,7 +802,7 @@ fun SettingsScreen(
                             DropdownMenu(
                                 expanded = modelDropdownExpanded,
                                 onDismissRequest = { modelDropdownExpanded = false },
-                                modifier = Modifier.background(CardGray)
+                                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 modelsList.forEach { modelName ->
                                     DropdownMenuItem(
@@ -825,7 +822,7 @@ fun SettingsScreen(
             // Export Image Format Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -839,7 +836,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(DarkGray)
+                            .background(MaterialTheme.colorScheme.surface)
                             .border(1.dp, AccentGray, RoundedCornerShape(8.dp))
                             .clickable { formatDropdownExpanded = true }
                             .padding(16.dp)
@@ -848,7 +845,7 @@ fun SettingsScreen(
                         DropdownMenu(
                             expanded = formatDropdownExpanded,
                             onDismissRequest = { formatDropdownExpanded = false },
-                            modifier = Modifier.background(CardGray)
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             formats.forEach { fmt ->
                                 DropdownMenuItem(
@@ -867,7 +864,7 @@ fun SettingsScreen(
             // TRIGGERcmd Auto-Wake Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
@@ -889,7 +886,7 @@ fun SettingsScreen(
                             Text(
                                 "Auto-start your ComfyUI server if offline using a TRIGGERcmd task.",
                                 fontSize = 12.sp,
-                                color = LightGray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
@@ -914,7 +911,7 @@ fun SettingsScreen(
                             Text(
                                 "API Token",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = LightGray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             OutlinedTextField(
                                 value = triggerCmdToken,
@@ -944,7 +941,7 @@ fun SettingsScreen(
                             Text(
                                 "Trigger Name",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = LightGray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             OutlinedTextField(
                                 value = triggerCmdName,
@@ -962,7 +959,7 @@ fun SettingsScreen(
                             Text(
                                 "Computer Name (Optional)",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = LightGray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             OutlinedTextField(
                                 value = triggerCmdComputer,
@@ -985,7 +982,7 @@ fun SettingsScreen(
             // Diagnostics & Logs Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -998,14 +995,14 @@ fun SettingsScreen(
                     Text(
                         "View application logs for troubleshooting connection or generation errors.",
                         fontSize = 13.sp,
-                        color = LightGray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = onViewLogsClick,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
+                            containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = Color.Black
                         ),
                         shape = RoundedCornerShape(24.dp)
@@ -1071,7 +1068,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .size(200.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(CardGray),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -1105,14 +1102,14 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "This workflow is in the visual UI format, not the required API format. The app cannot convert this locally. To use it, please choose one of the following:",
-                        color = LightGray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("•", color = Color.White)
                         Text(
                             text = "Option A: Open ComfyUI Manager on your PC, search for and install 'Workflow to API Converter Endpoint' (by SethRobinson). Once installed, this app will convert files automatically.",
-                            color = LightGray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 14.sp
                         )
                     }
@@ -1120,7 +1117,7 @@ fun SettingsScreen(
                         Text("•", color = Color.White)
                         Text(
                             text = "Option B: In ComfyUI, enable 'Dev mode Options', click 'Save (API format)', and import that new file instead.",
-                            color = LightGray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 14.sp
                         )
                     }
@@ -1131,7 +1128,7 @@ fun SettingsScreen(
                     Text("OK", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = CardGray
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     }
 
@@ -1148,7 +1145,7 @@ fun SettingsScreen(
             text = {
                 Text(
                     text = importState.message,
-                    color = LightGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
             },
@@ -1157,7 +1154,7 @@ fun SettingsScreen(
                     Text("OK", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
-            containerColor = CardGray
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     }
 }

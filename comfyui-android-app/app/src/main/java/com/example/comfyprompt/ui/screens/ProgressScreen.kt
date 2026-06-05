@@ -22,9 +22,6 @@ import com.example.comfyprompt.data.GenerationState
 import com.example.comfyprompt.data.ProgressInfo
 import com.example.comfyprompt.theme.AccentGray
 import com.example.comfyprompt.theme.AccentRed
-import com.example.comfyprompt.theme.CardGray
-import com.example.comfyprompt.theme.DarkGray
-import com.example.comfyprompt.theme.LightGray
 import com.example.comfyprompt.theme.SuccessGreen
 
 @Composable
@@ -48,7 +45,7 @@ fun ProgressScreen(
                 .fillMaxWidth()
                 .clickable { isExpanded = !isExpanded }
                 .animateContentSize(),
-            colors = CardDefaults.cardColors(containerColor = CardGray),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
@@ -111,7 +108,7 @@ fun ProgressScreen(
                     .height(6.dp)
                     .clip(RoundedCornerShape(3.dp)),
                 color = if (progressInfo.state == GenerationState.Failed) AccentRed else Color.White,
-                trackColor = DarkGray
+                trackColor = MaterialTheme.colorScheme.surface
             )
         }
     }
@@ -121,7 +118,7 @@ fun ProgressScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(16.dp))
-                .background(CardGray),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             val currentPreview = progressInfo.upscaleImage ?: progressInfo.baseImage
@@ -155,7 +152,7 @@ fun ProgressScreen(
                 .fillMaxWidth()
                 .height(50.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = DarkGray,
+                containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = AccentRed
             ),
             shape = RoundedCornerShape(25.dp)
@@ -165,7 +162,7 @@ fun ProgressScreen(
     }
 
     Scaffold(
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (isExpandedScreen) {
             Row(

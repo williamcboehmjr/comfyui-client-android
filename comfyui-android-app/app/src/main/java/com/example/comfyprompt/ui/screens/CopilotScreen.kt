@@ -38,9 +38,6 @@ import coil.compose.AsyncImage
 import com.example.comfyprompt.data.ChatMessage
 import com.example.comfyprompt.data.MessageSender
 import com.example.comfyprompt.theme.AccentGray
-import com.example.comfyprompt.theme.CardGray
-import com.example.comfyprompt.theme.DarkGray
-import com.example.comfyprompt.theme.LightGray
 import com.example.comfyprompt.theme.SuccessGreen
 
 @Composable
@@ -76,7 +73,7 @@ fun CopilotChatPanel(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(CardGray)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
         // Chat Header
         Row(
@@ -154,7 +151,7 @@ fun CopilotChatPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(DarkGray)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -206,7 +203,7 @@ fun CopilotChatPanel(
                 onClick = { filePickerLauncher.launch("image/*") },
                 modifier = Modifier
                     .size(40.dp)
-                    .background(DarkGray, CircleShape)
+                    .background(MaterialTheme.colorScheme.surface, CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -224,8 +221,8 @@ fun CopilotChatPanel(
                     .weight(1f)
                     .heightIn(max = 100.dp),
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = DarkGray,
-                    unfocusedContainerColor = DarkGray,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
                     focusedIndicatorColor = Color.Transparent,
@@ -273,7 +270,7 @@ fun CopilotMessageItem(
         // Text Bubble
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = if (isUser) DarkGray else Color.Black
+                containerColor = if (isUser) MaterialTheme.colorScheme.surface else Color.Black
             ),
             shape = RoundedCornerShape(
                 topStart = 16.dp,
@@ -304,7 +301,7 @@ fun CopilotMessageItem(
                                 modifier = Modifier
                                     .size(60.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(CardGray)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 AsyncImage(
                                     model = url,
@@ -323,7 +320,7 @@ fun CopilotMessageItem(
         if (message.refinedPrompt != null) {
             Spacer(modifier = Modifier.height(6.dp))
             Card(
-                colors = CardDefaults.cardColors(containerColor = DarkGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, SuccessGreen),
                 modifier = Modifier.widthIn(max = 280.dp)
@@ -359,7 +356,7 @@ fun CopilotMessageItem(
                     Text(
                         text = message.refinedPrompt,
                         fontSize = 12.sp,
-                        color = LightGray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(

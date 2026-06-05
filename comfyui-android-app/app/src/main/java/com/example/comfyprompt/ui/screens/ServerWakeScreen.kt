@@ -102,7 +102,7 @@ fun ServerWakeScreen(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(CircleShape)
-                        .background(CardGray)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
                 ) {
                     Icon(
@@ -159,7 +159,7 @@ fun ServerWakeScreen(
             Text(
                 text = statusDetail,
                 fontSize = 14.sp,
-                color = LightGray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
@@ -177,7 +177,7 @@ fun ServerWakeScreen(
                 .height(56.dp)
                 .padding(bottom = 8.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = CardGray,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = Color.White
             ),
             shape = RoundedCornerShape(28.dp),

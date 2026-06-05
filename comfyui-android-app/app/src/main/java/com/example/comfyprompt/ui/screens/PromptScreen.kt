@@ -29,9 +29,6 @@ import com.example.comfyprompt.data.AppSettings
 import com.example.comfyprompt.data.SeedMode
 import com.example.comfyprompt.theme.AccentGray
 import com.example.comfyprompt.theme.AccentRed
-import com.example.comfyprompt.theme.CardGray
-import com.example.comfyprompt.theme.DarkGray
-import com.example.comfyprompt.theme.LightGray
 import com.example.comfyprompt.theme.SuccessGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,7 +54,7 @@ fun PromptScreen(
     val promptInputCard = @Composable {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = CardGray),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -70,7 +67,7 @@ fun PromptScreen(
                         "ENTER YOUR PROMPT",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = AccentGray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (prompt.isNotEmpty()) {
                         Text(
@@ -88,21 +85,21 @@ fun PromptScreen(
                 OutlinedTextField(
                     value = prompt,
                     onValueChange = onPromptChange,
-                    placeholder = { Text("e.g. A futuristic glass-domed biodome in a dark rainforest...", color = AccentGray) },
+                    placeholder = { Text("e.g. A futuristic glass-domed biodome in a dark rainforest...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = AccentGray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = DarkGray, thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -114,17 +111,17 @@ fun PromptScreen(
                             text = "Gemini Prompt Enhancer",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Switch(
                         checked = settings.enableEnhancer,
                         onCheckedChange = { onEnhancerToggle(it) },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.Black,
-                            checkedTrackColor = Color.White,
-                            uncheckedThumbColor = AccentGray,
-                            uncheckedTrackColor = DarkGray
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surface
                         )
                     )
                 }
@@ -135,7 +132,7 @@ fun PromptScreen(
     val seedCard = @Composable {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = CardGray),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -143,7 +140,7 @@ fun PromptScreen(
                     "SEED SETTING",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = AccentGray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 // Seed Mode Selectors
@@ -157,10 +154,10 @@ fun PromptScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSelected) Color.White else DarkGray)
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                                 .border(
                                     width = 1.dp,
-                                    color = if (isSelected) Color.White else AccentGray,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .clickable {
@@ -173,7 +170,7 @@ fun PromptScreen(
                                 text = mode.name,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isSelected) Color.Black else Color.White
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -185,21 +182,21 @@ fun PromptScreen(
                         Text(
                             "Using standard fixed seed: ${settings.fixedSeedValue}",
                             fontSize = 13.sp,
-                            color = LightGray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     SeedMode.LastUsed -> {
                         Text(
                             "Re-using last generated seed: ${settings.lastUsedSeedValue}",
                             fontSize = 13.sp,
-                            color = LightGray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     SeedMode.Random -> {
                         Text(
                             "Generating random seed on launch.",
                             fontSize = 13.sp,
-                            color = LightGray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     SeedMode.Custom -> {
@@ -211,14 +208,14 @@ fun PromptScreen(
                                     onSeedModeChange(SeedMode.Custom, newValue.toLongOrNull() ?: 42L)
                                 }
                             },
-                            label = { Text("Custom Seed Number", color = AccentGray) },
+                            label = { Text("Custom Seed Number", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.White,
-                                unfocusedBorderColor = AccentGray,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                             ),
                             shape = RoundedCornerShape(8.dp)
                         )
@@ -231,7 +228,7 @@ fun PromptScreen(
     val resolutionCard = @Composable {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = CardGray),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -239,7 +236,7 @@ fun PromptScreen(
                     "RESOLUTION & ASPECT RATIO",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = AccentGray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 val megapixelOptions = listOf(
@@ -282,7 +279,7 @@ fun PromptScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Aspect Ratio", fontSize = 14.sp, color = LightGray)
+                    Text("Aspect Ratio", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -292,7 +289,7 @@ fun PromptScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .clickable {
                                     val currentIndex = aspectRatios.indexOf(settings.aspectRatio)
                                     if (currentIndex > 0) {
@@ -302,7 +299,7 @@ fun PromptScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("-", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
 
                         // Dropdown Selector Box
@@ -311,19 +308,19 @@ fun PromptScreen(
                                 .width(160.dp)
                                 .height(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .clickable { arDropdownExpanded = true },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(settings.aspectRatio, color = Color.White, fontSize = 12.sp, maxLines = 1, textAlign = TextAlign.Center)
+                            Text(settings.aspectRatio, color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, maxLines = 1, textAlign = TextAlign.Center)
                             DropdownMenu(
                                 expanded = arDropdownExpanded,
                                 onDismissRequest = { arDropdownExpanded = false },
-                                modifier = Modifier.background(CardGray)
+                                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 aspectRatios.forEach { ar ->
                                     DropdownMenuItem(
-                                        text = { Text(ar, color = Color.White) },
+                                        text = { Text(ar, color = MaterialTheme.colorScheme.onSurface) },
                                         onClick = {
                                             onAspectRatioChange(ar)
                                             arDropdownExpanded = false
@@ -338,7 +335,7 @@ fun PromptScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .clickable {
                                     val currentIndex = aspectRatios.indexOf(settings.aspectRatio)
                                     if (currentIndex < aspectRatios.lastIndex && currentIndex != -1) {
@@ -348,7 +345,7 @@ fun PromptScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("+", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("+", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
                     }
                 }
@@ -359,7 +356,7 @@ fun PromptScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Megapixels (Size)", fontSize = 14.sp, color = LightGray)
+                    Text("Megapixels (Size)", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -369,7 +366,7 @@ fun PromptScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .clickable {
                                     val currentIndex = megapixelOptions.indexOf(settings.megapixel)
                                     if (currentIndex > 0) {
@@ -379,7 +376,7 @@ fun PromptScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("-", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
 
                         // Dropdown Selector Box
@@ -388,19 +385,19 @@ fun PromptScreen(
                                 .width(90.dp)
                                 .height(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .clickable { mpDropdownExpanded = true },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(settings.megapixel + " MP", color = Color.White, fontSize = 13.sp)
+                            Text(settings.megapixel + " MP", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
                             DropdownMenu(
                                 expanded = mpDropdownExpanded,
                                 onDismissRequest = { mpDropdownExpanded = false },
-                                modifier = Modifier.background(CardGray)
+                                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 megapixelOptions.forEach { mp ->
                                     DropdownMenuItem(
-                                        text = { Text(mp + " MP", color = Color.White) },
+                                        text = { Text(mp + " MP", color = MaterialTheme.colorScheme.onSurface) },
                                         onClick = {
                                             onMegapixelChange(mp)
                                             mpDropdownExpanded = false
@@ -415,7 +412,7 @@ fun PromptScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(DarkGray)
+                                .background(MaterialTheme.colorScheme.surface)
                                 .clickable {
                                     val currentIndex = megapixelOptions.indexOf(settings.megapixel)
                                     if (currentIndex < megapixelOptions.lastIndex && currentIndex != -1) {
@@ -425,7 +422,7 @@ fun PromptScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("+", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("+", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
                     }
                 }
@@ -453,14 +450,14 @@ fun PromptScreen(
         if (!settings.enableEnhancer) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
                     text = "⏸️ $provider Prompt Enhancer is Disabled",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AccentGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(12.dp),
                     textAlign = TextAlign.Center
                 )
@@ -468,20 +465,20 @@ fun PromptScreen(
         } else if (!hasKey) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
                     text = "💡 Pro Tip: Input your $provider API Key in Settings to enable automatic prompt enhancement!",
                     fontSize = 12.sp,
-                    color = AccentGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(12.dp)
                 )
             }
         } else {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGray),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
@@ -510,10 +507,10 @@ fun PromptScreen(
                 .fillMaxWidth()
                 .height(56.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = Color.Black,
-                disabledContainerColor = DarkGray,
-                disabledContentColor = AccentGray
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                disabledContainerColor = MaterialTheme.colorScheme.surface,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             ),
             shape = RoundedCornerShape(28.dp)
         ) {
@@ -530,21 +527,21 @@ fun PromptScreen(
                         "ComfyPrompt",
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 actions = {
                     IconButton(onClick = onGalleryClick) {
-                        Icon(Icons.Default.Image, contentDescription = "Creations Gallery", tint = Color.White)
+                        Icon(Icons.Default.Image, contentDescription = "Creations Gallery", tint = MaterialTheme.colorScheme.onSurface)
                     }
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (isExpandedScreen) {
             Row(

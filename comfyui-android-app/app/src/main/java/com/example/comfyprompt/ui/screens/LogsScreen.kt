@@ -29,8 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.comfyprompt.network.AppLogger
-import com.example.comfyprompt.theme.CardGray
-import com.example.comfyprompt.theme.DarkGray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -137,10 +135,10 @@ fun LogsScreen(
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -188,7 +186,7 @@ fun LogsScreen(
                 Button(
                     onClick = { exportLogFile() },
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkGray, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = Color.White),
                     contentPadding = PaddingValues(vertical = 12.dp)
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -200,7 +198,7 @@ fun LogsScreen(
                 Button(
                     onClick = { shareLogText() },
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkGray, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = Color.White),
                     contentPadding = PaddingValues(vertical = 12.dp)
                 ) {
                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -228,7 +226,7 @@ fun LogsScreen(
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
             title = { Text("Clear Logs?", color = Color.White) },
-            text = { Text("This will permanently delete all local log files. This cannot be undone.", color = Color.LightGray) },
+            text = { Text("This will permanently delete all local log files. This cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -245,7 +243,7 @@ fun LogsScreen(
                     Text("CANCEL", color = Color.White)
                 }
             },
-            containerColor = CardGray
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     }
 }

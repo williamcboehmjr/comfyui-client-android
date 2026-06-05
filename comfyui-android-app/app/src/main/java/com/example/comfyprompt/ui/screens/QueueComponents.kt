@@ -39,7 +39,7 @@ fun QueueFAB(
         FloatingActionButton(
             onClick = onClick,
             shape = CircleShape,
-            containerColor = CardGray,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = White,
             modifier = Modifier
                 .size(56.dp)
@@ -114,7 +114,7 @@ fun QueueBottomSheetContent(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(CardGray)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -173,7 +173,7 @@ fun QueueBottomSheetContent(
             }
         }
 
-        HorizontalDivider(color = CardGray, thickness = 1.dp)
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 1.dp)
 
         // 1. Active Job
         if (activeJob != null) {
@@ -194,7 +194,7 @@ fun QueueBottomSheetContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .clickable { onJobClick(activeJob.id) },
-                    colors = CardDefaults.cardColors(containerColor = CardGray),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(
@@ -225,7 +225,7 @@ fun QueueBottomSheetContent(
                                 Text(
                                     text = progressText,
                                     fontSize = 13.sp,
-                                    color = LightGray
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
 
@@ -233,7 +233,7 @@ fun QueueBottomSheetContent(
                                 onClick = { onCancelJob(activeJob.id) },
                                 modifier = Modifier
                                     .size(32.dp)
-                                    .background(DarkGray, CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface, CircleShape)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
@@ -257,7 +257,7 @@ fun QueueBottomSheetContent(
                                     .height(6.dp)
                                     .clip(RoundedCornerShape(3.dp)),
                                 color = SuccessGreen,
-                                trackColor = DarkGray
+                                trackColor = MaterialTheme.colorScheme.surface
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -304,7 +304,7 @@ fun QueueBottomSheetContent(
                     items(pendingJobs, key = { it.id }) { job ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = DarkGray),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Row(

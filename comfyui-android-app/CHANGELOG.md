@@ -3,6 +3,16 @@
 All notable changes to **ComfyUI Client** are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.2] - 2026-06-05
+
+### 🎨 Material 3 Design Upgrades
+- **Dynamic Colors (Monet Engine)**: Added support for wallpaper-matched dynamic dark color schemes on Android 12+ (API 31+).
+- **Fallback Palette**: Re-designed theme colors to utilize a premium dark-slate background (`SlateBg`), deep slate cards (`SlateSurfaceVariant`), matching borders, and soft indigo primary accents.
+- **Semantic Theme Tokens**: Refactored all UI screens (Prompt, Settings, Progress, Result, Copilot, Gallery, ServerWake, QueueComponents, and Logs) to completely remove hardcoded, static color references (`CardGray`, `DarkGray`, `LightGray`) and retrieve them dynamically via `MaterialTheme.colorScheme`.
+- **Refined Typography Scale**: Tuned semantic typographic roles (headlines, body, and label text) inside `Type.kt` with custom font weights and line spacings.
+
+---
+
 ## [1.2.1] - 2026-06-05
 
 ### 🐛 Bug Fixes
