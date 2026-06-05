@@ -8,6 +8,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 
 enum class PingResult {
     ONLINE,
@@ -23,7 +24,7 @@ object TriggerCmdClient {
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
         .writeTimeout(5, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(false)
+        .retryOnConnectionFailure(true)
         .build()
 
     private val wakeClient = OkHttpClient.Builder()
@@ -89,32 +90,44 @@ object TriggerCmdClient {
 
     suspend fun pollLocalServer(serverUrl: String): PingResult = withContext(Dispatchers.IO) {
         val cleanUrl = serverUrl.removeSuffix("/")
-        try {
-            // ComfyUI system check or main page ping
-            val request = Request.Builder()
-                .url(cleanUrl)
-                .get()
-                .build()
+        var lastPingResult = PingResult.HOST_UNREACHABLE
+        val maxAttempts = 3
 
-            pingClient.newCall(request).execute().use { response ->
-                AppLogger.d("TriggerCmdClient", "Ping ComfyUI returned code: ${response.code}")
-                return@withContext PingResult.ONLINE
-            }
-        } catch (e: Exception) {
-            val msg = e.localizedMessage ?: ""
-            AppLogger.d("TriggerCmdClient", "Ping local server failed to connect to $cleanUrl (normal if booting): $msg")
-            
-            if (isHostUnreachableException(e)) {
-                return@withContext PingResult.HOST_UNREACHABLE
-            }
+        for (attempt in 1..maxAttempts) {
+            AppLogger.d("TriggerCmdClient", "Pinging local server attempt $attempt/$maxAttempts...")
+            try {
+                // ComfyUI system check or main page ping
+                val request = Request.Builder()
+                    .url(cleanUrl)
+                    .get()
+                    .addHeader("Connection", "close") // Avoid OkHttp stale connection pooling reuse
+                    .build()
 
-            val isRefused = msg.contains("refused", ignoreCase = true) || 
-                            msg.contains("Connection refused", ignoreCase = true)
-            if (isRefused) {
-                return@withContext PingResult.HOST_ALIVE_SERVER_DOWN
-            }
+                pingClient.newCall(request).execute().use { response ->
+                    AppLogger.d("TriggerCmdClient", "Ping ComfyUI attempt $attempt success. Code: ${response.code}")
+                    return@withContext PingResult.ONLINE
+                }
+            } catch (e: Exception) {
+                val msg = e.localizedMessage ?: ""
+                AppLogger.d("TriggerCmdClient", "Ping local server failed on attempt $attempt to connect to $cleanUrl: $msg")
+                
+                if (isHostUnreachableException(e)) {
+                    lastPingResult = PingResult.HOST_UNREACHABLE
+                }
 
-            // Run a quick ICMP ping check to see if the host is reachable
+                val isRefused = msg.contains("refused", ignoreCase = true) || 
+                                msg.contains("Connection refused", ignoreCase = true)
+                if (isRefused) {
+                    lastPingResult = PingResult.HOST_ALIVE_SERVER_DOWN
+                }
+
+                if (attempt < maxAttempts) {
+                    delay(500)
+                }
+            }
+        }
+
+        if (lastPingResult == PingResult.HOST_UNREACHABLE) {
             try {
                 val uri = java.net.URI(cleanUrl)
                 val host = uri.host
@@ -131,8 +144,8 @@ object TriggerCmdClient {
             } catch (pingEx: Exception) {
                 AppLogger.d("TriggerCmdClient", "Failed to run ICMP ping check: ${pingEx.localizedMessage}")
             }
-
-            return@withContext PingResult.HOST_UNREACHABLE
         }
+
+        return@withContext lastPingResult
     }
 }
