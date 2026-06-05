@@ -3,6 +3,13 @@
 All notable changes to **ComfyUI Client** are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.1] - 2026-06-05
+
+### 🐛 Bug Fixes
+- **Resilient Connection Checks**: Added a 3-attempt retry loop with `500ms` delay in `pollLocalServer` to prevent transient network issues or stale sockets in OkHttp's connection pool from prematurely firing the TRIGGERcmd wake sequence.
+- Added `Connection: close` header to ping requests to bypass stale pooled connections.
+- Set `retryOnConnectionFailure(true)` on the connection ping client.
+
 ---
 
 ## [1.2.0] - 2026-06-05
