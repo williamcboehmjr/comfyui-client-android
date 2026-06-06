@@ -3,7 +3,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-purple.svg)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack-Compose-blue.svg)](https://developer.android.com/jetpack/compose)
-[![Version](https://img.shields.io/badge/Version-1.2.6-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.7-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **ComfyUI Client** is a fully native Android app that gives you a clean, touch-friendly mobile interface for your [ComfyUI](https://github.com/comfyanonymous/ComfyUI) image generation server.

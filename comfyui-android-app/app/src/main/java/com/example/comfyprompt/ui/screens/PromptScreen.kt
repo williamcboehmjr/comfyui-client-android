@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -854,65 +856,72 @@ fun PromptScreen(
     }
 
     if (showWorkflowSheet) {
+        val workflowSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val importedFileExists = remember {
+            context.getFileStreamPath("imported_workflow.json").exists()
+        }
         ModalBottomSheet(
             onDismissRequest = { showWorkflowSheet = false },
+            sheetState = workflowSheetState,
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             scrimColor = Color.Black.copy(alpha = 0.6f)
         ) {
-            Column(
+            Text(
+                text = "SELECT WORKFLOW",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 8.dp)
+            )
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
                     .navigationBarsPadding(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = "SELECT WORKFLOW",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
                 // Option for Default Workflow
-                val isDefaultActive = settings.workflowToUse == ""
-                ListItem(
-                    headlineContent = { Text("Default Workflow (ernie_workflow.json)", fontWeight = if (isDefaultActive) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            onWorkflowChange("")
-                            showWorkflowSheet = false
-                        },
-                    colors = ListItemDefaults.colors(
-                        containerColor = if (isDefaultActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                    )
-                )
-
-                // Option for Imported Local Workflow if it exists
-                val importedFileExists = remember {
-                    context.getFileStreamPath("imported_workflow.json").exists()
-                }
-                if (importedFileExists) {
-                    val isImportedActive = settings.workflowToUse == "imported_workflow.json"
+                item {
+                    val isDefaultActive = settings.workflowToUse == ""
                     ListItem(
-                        headlineContent = { Text("Imported Local Workflow (imported_workflow.json)", fontWeight = if (isImportedActive) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface) },
+                        headlineContent = { Text("Default Workflow (ernie_workflow.json)", fontWeight = if (isDefaultActive) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
-                                onWorkflowChange("imported_workflow.json")
+                                onWorkflowChange("")
                                 showWorkflowSheet = false
                             },
                         colors = ListItemDefaults.colors(
-                            containerColor = if (isImportedActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                            containerColor = if (isDefaultActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                         )
                     )
                 }
 
+                // Option for Imported Local Workflow if it exists
+                if (importedFileExists) {
+                    item {
+                        val isImportedActive = settings.workflowToUse == "imported_workflow.json"
+                        ListItem(
+                            headlineContent = { Text("Imported Local Workflow (imported_workflow.json)", fontWeight = if (isImportedActive) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    onWorkflowChange("imported_workflow.json")
+                                    showWorkflowSheet = false
+                                },
+                            colors = ListItemDefaults.colors(
+                                containerColor = if (isImportedActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                            )
+                        )
+                    }
+                }
+
                 // Options for saved workflows
-                savedWorkflows.forEach { workflow ->
+                items(savedWorkflows) { workflow ->
                     val isActive = settings.workflowToUse == workflow
                     ListItem(
                         headlineContent = { Text(workflow, fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface) },
