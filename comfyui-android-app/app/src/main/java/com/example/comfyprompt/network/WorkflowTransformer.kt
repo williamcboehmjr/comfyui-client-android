@@ -322,31 +322,33 @@ object WorkflowTransformer {
             }
 
             // Resolution injection
-            val isLatentGenerator = classType != null && (
-                classType == "EmptyFlux2LatentImage" ||
-                classType == "EmptyLatentImage" ||
-                classType.contains("LatentImage") ||
-                classType.contains("EmptyLatent") ||
-                classType.startsWith("EmptySD3") ||
-                classType.startsWith("SD3LatentImage")
-            )
+            if (inputImageName.isNullOrBlank()) {
+                val isLatentGenerator = classType != null && (
+                    classType == "EmptyFlux2LatentImage" ||
+                    classType == "EmptyLatentImage" ||
+                    classType.contains("LatentImage") ||
+                    classType.contains("EmptyLatent") ||
+                    classType.startsWith("EmptySD3") ||
+                    classType.startsWith("SD3LatentImage")
+                )
 
-            if (isLatentGenerator) {
-                inputs.addProperty("width", width)
-                inputs.addProperty("height", height)
-            } else {
-                val wVal = inputs.get("width")
-                val hVal = inputs.get("height")
-                if (wVal?.isJsonArray == true) {
-                    val srcId = wVal.asJsonArray[0].asString
-                    if (srcId in fluxResNodeIds) {
-                        inputs.addProperty("width", width)
+                if (isLatentGenerator) {
+                    inputs.addProperty("width", width)
+                    inputs.addProperty("height", height)
+                } else {
+                    val wVal = inputs.get("width")
+                    val hVal = inputs.get("height")
+                    if (wVal?.isJsonArray == true) {
+                        val srcId = wVal.asJsonArray[0].asString
+                        if (srcId in fluxResNodeIds) {
+                            inputs.addProperty("width", width)
+                        }
                     }
-                }
-                if (hVal?.isJsonArray == true) {
-                    val srcId = hVal.asJsonArray[0].asString
-                    if (srcId in fluxResNodeIds) {
-                        inputs.addProperty("height", height)
+                    if (hVal?.isJsonArray == true) {
+                        val srcId = hVal.asJsonArray[0].asString
+                        if (srcId in fluxResNodeIds) {
+                            inputs.addProperty("height", height)
+                        }
                     }
                 }
             }

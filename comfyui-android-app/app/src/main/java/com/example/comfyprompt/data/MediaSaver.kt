@@ -45,47 +45,55 @@ object MediaSaver {
                     else -> "image/png"
                 }
 
-                val resolver = context.contentResolver
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val resolver = context.contentResolver
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ComfyPrompt")
                         put(MediaStore.MediaColumns.IS_PENDING, 1)
-                    } else {
-                        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                        val file = File(downloadsDir, displayName)
-                        put(MediaStore.MediaColumns.DATA, file.absolutePath)
                     }
-                }
 
-                val collectionUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI
-                } else {
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                }
-
-                val uri = resolver.insert(collectionUri, contentValues)
-                if (uri != null) {
-                    resolver.openOutputStream(uri).use { outputStream ->
-                        if (outputStream != null) {
-                            outputStream.write(bytes)
-                            outputStream.flush()
+                    val collectionUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                    val uri = resolver.insert(collectionUri, contentValues)
+                    if (uri != null) {
+                        resolver.openOutputStream(uri).use { outputStream ->
+                            if (outputStream != null) {
+                                outputStream.write(bytes)
+                                outputStream.flush()
+                            }
                         }
-                    }
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         contentValues.clear()
                         contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
                         resolver.update(uri, contentValues, null, null)
-                    }
 
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Saved to Downloads: $displayName", Toast.LENGTH_LONG).show()
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Saved to Pictures/ComfyPrompt: $displayName", Toast.LENGTH_LONG).show()
+                        }
+                    } else {
+                        throw Exception("Failed to insert MediaStore row")
                     }
                 } else {
+                    // API < 29: Use direct File I/O
+                    val picturesDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "ComfyPrompt")
+                    if (!picturesDir.exists()) {
+                        picturesDir.mkdirs()
+                    }
+                    val file = File(picturesDir, displayName)
+                    FileOutputStream(file).use { outputStream ->
+                        outputStream.write(bytes)
+                        outputStream.flush()
+                    }
+                    
+                    // Trigger media scanner scan
+                    val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                    val contentUri = Uri.fromFile(file)
+                    mediaScanIntent.data = contentUri
+                    context.sendBroadcast(mediaScanIntent)
+
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Error inserting MediaStore row.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Saved to Pictures/ComfyPrompt: $displayName", Toast.LENGTH_LONG).show()
                     }
                 }
             }
@@ -156,47 +164,55 @@ object MediaSaver {
             }
 
             val fileName = "workflow.json"
-            val resolver = context.contentResolver
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val resolver = context.contentResolver
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
-                } else {
-                    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    val file = File(downloadsDir, fileName)
-                    put(MediaStore.MediaColumns.DATA, file.absolutePath)
                 }
-            }
 
-            val collectionUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI
-            } else {
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI // Fallback
-            }
-
-            val uri = resolver.insert(collectionUri, contentValues)
-            if (uri != null) {
-                resolver.openOutputStream(uri).use { outputStream ->
-                    if (outputStream != null) {
-                        outputStream.write(jsonString.toByteArray())
-                        outputStream.flush()
+                val collectionUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val uri = resolver.insert(collectionUri, contentValues)
+                if (uri != null) {
+                    resolver.openOutputStream(uri).use { outputStream ->
+                        if (outputStream != null) {
+                            outputStream.write(jsonString.toByteArray())
+                            outputStream.flush()
+                        }
                     }
-                }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     contentValues.clear()
                     contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
                     resolver.update(uri, contentValues, null, null)
+
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Saved workflow.json to Downloads!", Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    throw Exception("Failed to insert MediaStore row")
                 }
+            } else {
+                // API < 29: Use direct File I/O
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) {
+                    downloadsDir.mkdirs()
+                }
+                val file = File(downloadsDir, fileName)
+                FileOutputStream(file).use { outputStream ->
+                    outputStream.write(jsonString.toByteArray())
+                    outputStream.flush()
+                }
+                
+                // Trigger media scanner scan
+                val mediaScanIntent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                val contentUri = Uri.fromFile(file)
+                mediaScanIntent.data = contentUri
+                context.sendBroadcast(mediaScanIntent)
 
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Saved workflow.json to Downloads!", Toast.LENGTH_LONG).show()
-                }
-            } else {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Failed to create workflow.json in Downloads.", Toast.LENGTH_SHORT).show()
                 }
             }
         } catch (e: Exception) {

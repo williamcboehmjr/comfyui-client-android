@@ -3,6 +3,17 @@
 All notable changes to **ComfyUI Client** are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.8] - 2026-06-06
+
+### 🐛 Bug Fixes & Improvements
+- **Workflow Selector Scroll Fix**: Added constraint modifiers (`.weight(1f, fill = false)`) to the workflow selector's `LazyColumn` inside `ModalBottomSheet` to fix scroll-locking issues and allow the entire workflow list to scroll correctly.
+- **Img2Img Resolution Bypass**: Skipped resolution/aspect ratio property injection in the workflow graph transformation when an input image is uploaded, ensuring the uploaded photo's original dimensions dictate generation.
+- **Robust Media Store & File Saving**:
+  - Configured output images to save to `Pictures/ComfyPrompt` using `MediaStore.Images.Media.EXTERNAL_CONTENT_URI` on API 29+ so they are indexed immediately in the system gallery apps (Google Photos, etc.).
+  - Implemented direct File I/O fallback logic on older API versions (< 29) for saving both output images and exported JSON workflow files to bypass MediaStore exceptions.
+
+---
+
 ## [1.2.2] - 2026-06-05
 
 ### 🎨 Material 3 Design Upgrades

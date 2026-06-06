@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.comfyprompt"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.2.7"
+        versionCode = 16
+        versionName = "1.2.8"
     }
 
     buildTypes {

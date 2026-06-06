@@ -256,217 +256,243 @@ fun PromptScreen(
     }
 
     val resolutionAccordion = @Composable {
+        val hasInputImage = selectedImageUri != null
+        val accordionAlpha = if (hasInputImage) 0.4f else 1f
         AccordionSection(
-            title = "RESOLUTION & ASPECT RATIO",
-            isExpanded = resolutionExpanded,
-            onHeaderClick = { resolutionExpanded = !resolutionExpanded }
+            title = if (hasInputImage) "RESOLUTION & ASPECT RATIO  🔒" else "RESOLUTION & ASPECT RATIO",
+            isExpanded = resolutionExpanded && !hasInputImage,
+            onHeaderClick = {
+                if (hasInputImage) {
+                    // Do nothing — locked by input image
+                } else {
+                    resolutionExpanded = !resolutionExpanded
+                }
+            }
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                val megapixelOptions = listOf(
-                    "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0",
-                    "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "2.0",
-                    "2.1", "2.2", "2.3", "2.4", "2.5"
-                )
-                val aspectRatios = listOf(
-                    "1:1 (Perfect Square)",
-                    "2:3 (Classic Portrait)",
-                    "3:4 (Golden Ratio)",
-                    "3:5 (Elegant Vertical)",
-                    "4:5 (Artistic Frame)",
-                    "5:7 (Balanced Portrait)",
-                    "5:8 (Tall Portrait)",
-                    "7:9 (Modern Portrait)",
-                    "9:16 (Slim Vertical)",
-                    "9:19 (Tall Slim)",
-                    "9:21 (Ultra Tall)",
-                    "9:32 (Skyline)",
-                    "3:2 (Golden Landscape)",
-                    "4:3 (Classic Landscape)",
-                    "5:3 (Wide Horizon)",
-                    "5:4 (Balanced Frame)",
-                    "7:5 (Elegant Landscape)",
-                    "8:5 (Cinematic View)",
-                    "9:7 (Artful Horizon)",
-                    "16:9 (Panorama)",
-                    "19:9 (Cinematic Ultrawide)",
-                    "21:9 (Epic Ultrawide)",
-                    "32:9 (Extreme Ultrawide)"
-                )
-
-                var mpDropdownExpanded by remember { mutableStateOf(false) }
-                var arDropdownExpanded by remember { mutableStateOf(false) }
-
+            if (hasInputImage) {
+                // Locked info row
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Aspect Ratio", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "Input image dimensions will be used",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    val megapixelOptions = listOf(
+                        "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0",
+                        "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "2.0",
+                        "2.1", "2.2", "2.3", "2.4", "2.5"
+                    )
+                    val aspectRatios = listOf(
+                        "1:1 (Perfect Square)",
+                        "2:3 (Classic Portrait)",
+                        "3:4 (Golden Ratio)",
+                        "3:5 (Elegant Vertical)",
+                        "4:5 (Artistic Frame)",
+                        "5:7 (Balanced Portrait)",
+                        "5:8 (Tall Portrait)",
+                        "7:9 (Modern Portrait)",
+                        "9:16 (Slim Vertical)",
+                        "9:19 (Tall Slim)",
+                        "9:21 (Ultra Tall)",
+                        "9:32 (Skyline)",
+                        "3:2 (Golden Landscape)",
+                        "4:3 (Classic Landscape)",
+                        "5:3 (Wide Horizon)",
+                        "5:4 (Balanced Frame)",
+                        "7:5 (Elegant Landscape)",
+                        "8:5 (Cinematic View)",
+                        "9:7 (Artful Horizon)",
+                        "16:9 (Panorama)",
+                        "19:9 (Cinematic Ultrawide)",
+                        "21:9 (Epic Ultrawide)",
+                        "32:9 (Extreme Ultrawide)"
+                    )
+
+                    var mpDropdownExpanded by remember { mutableStateOf(false) }
+                    var arDropdownExpanded by remember { mutableStateOf(false) }
+
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable {
-                                    val currentIndex = aspectRatios.indexOf(settings.aspectRatio)
-                                    if (currentIndex > 0) {
-                                        val newVal = aspectRatios[currentIndex - 1]
-                                        onAspectRatioChange(newVal)
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
+                        Text("Aspect Ratio", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .width(200.dp)
-                                .height(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable { arDropdownExpanded = true }
-                                .padding(horizontal = 8.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                AspectRatioIcon(aspectRatio = settings.aspectRatio)
-                                Text(
-                                    text = settings.aspectRatio,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = arDropdownExpanded,
-                                onDismissRequest = { arDropdownExpanded = false },
-                                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
-                            ) {
-                                aspectRatios.forEach { ar ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Row(
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                AspectRatioIcon(aspectRatio = ar)
-                                                Text(ar, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
-                                            }
-                                        },
-                                        onClick = {
-                                            onAspectRatioChange(ar)
-                                            arDropdownExpanded = false
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .clickable {
+                                        val currentIndex = aspectRatios.indexOf(settings.aspectRatio)
+                                        if (currentIndex > 0) {
+                                            val newVal = aspectRatios[currentIndex - 1]
+                                            onAspectRatioChange(newVal)
                                         }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .width(200.dp)
+                                    .height(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .clickable { arDropdownExpanded = true }
+                                    .padding(horizontal = 8.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    AspectRatioIcon(aspectRatio = settings.aspectRatio)
+                                    Text(
+                                        text = settings.aspectRatio,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable {
-                                    val currentIndex = aspectRatios.indexOf(settings.aspectRatio)
-                                    if (currentIndex < aspectRatios.lastIndex && currentIndex != -1) {
-                                        val newVal = aspectRatios[currentIndex + 1]
-                                        onAspectRatioChange(newVal)
+                                DropdownMenu(
+                                    expanded = arDropdownExpanded,
+                                    onDismissRequest = { arDropdownExpanded = false },
+                                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    aspectRatios.forEach { ar ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    AspectRatioIcon(aspectRatio = ar)
+                                                    Text(ar, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                                                }
+                                            },
+                                            onClick = {
+                                                onAspectRatioChange(ar)
+                                                arDropdownExpanded = false
+                                            }
+                                        )
                                     }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("+", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .clickable {
+                                        val currentIndex = aspectRatios.indexOf(settings.aspectRatio)
+                                        if (currentIndex < aspectRatios.lastIndex && currentIndex != -1) {
+                                            val newVal = aspectRatios[currentIndex + 1]
+                                            onAspectRatioChange(newVal)
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("+", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
                         }
                     }
-                }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Megapixels (Size)", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable {
-                                    val currentIndex = megapixelOptions.indexOf(settings.megapixel)
-                                    if (currentIndex > 0) {
-                                        val newVal = megapixelOptions[currentIndex - 1]
-                                        onMegapixelChange(newVal)
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
+                        Text("Megapixels (Size)", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .width(90.dp)
-                                .height(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable { mpDropdownExpanded = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(settings.megapixel + " MP", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
-                            DropdownMenu(
-                                expanded = mpDropdownExpanded,
-                                onDismissRequest = { mpDropdownExpanded = false },
-                                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
-                            ) {
-                                megapixelOptions.forEach { mp ->
-                                    DropdownMenuItem(
-                                        text = { Text(mp + " MP", color = MaterialTheme.colorScheme.onSurface) },
-                                        onClick = {
-                                            onMegapixelChange(mp)
-                                            mpDropdownExpanded = false
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .clickable {
+                                        val currentIndex = megapixelOptions.indexOf(settings.megapixel)
+                                        if (currentIndex > 0) {
+                                            val newVal = megapixelOptions[currentIndex - 1]
+                                            onMegapixelChange(newVal)
                                         }
-                                    )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .width(90.dp)
+                                    .height(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .clickable { mpDropdownExpanded = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(settings.megapixel + " MP", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                                DropdownMenu(
+                                    expanded = mpDropdownExpanded,
+                                    onDismissRequest = { mpDropdownExpanded = false },
+                                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    megapixelOptions.forEach { mp ->
+                                        DropdownMenuItem(
+                                            text = { Text(mp + " MP", color = MaterialTheme.colorScheme.onSurface) },
+                                            onClick = {
+                                                onMegapixelChange(mp)
+                                                mpDropdownExpanded = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable {
-                                    val currentIndex = megapixelOptions.indexOf(settings.megapixel)
-                                    if (currentIndex < megapixelOptions.lastIndex && currentIndex != -1) {
-                                        val newVal = megapixelOptions[currentIndex + 1]
-                                        onMegapixelChange(newVal)
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("+", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .clickable {
+                                        val currentIndex = megapixelOptions.indexOf(settings.megapixel)
+                                        if (currentIndex < megapixelOptions.lastIndex && currentIndex != -1) {
+                                            val newVal = megapixelOptions[currentIndex + 1]
+                                            onMegapixelChange(newVal)
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("+", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
                         }
                     }
                 }
@@ -878,6 +904,7 @@ fun PromptScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f, fill = false)
                     .navigationBarsPadding(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
