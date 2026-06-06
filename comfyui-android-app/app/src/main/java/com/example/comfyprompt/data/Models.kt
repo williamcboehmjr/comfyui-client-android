@@ -76,7 +76,8 @@ data class ProgressInfo(
     val finalImage: String? = null,     // Image view path/URL
     val enhancedPrompt: String? = null, // Enhanced prompt from Gemini
     val currentStage: String = "",
-    val activeNodeStages: Map<String, String>? = null
+    val activeNodeStages: Map<String, String>? = null,
+    val previews: List<String> = emptyList()
 )
 
 data class GalleryItem(

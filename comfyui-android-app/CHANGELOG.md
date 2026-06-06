@@ -3,6 +3,14 @@
 All notable changes to **ComfyUI Client** are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.9] - 2026-06-06
+
+### 🔄 Refactoring & Branding
+- **Image Refiner Chat**: Renamed all occurrences of "Copilot" or "Vision Refiner" to **Image Refiner Chat** across the codebase, layouts, indicators, and documentation to ensure branding consistency.
+- **Improved Project Cleanliness**: Updated package imports, filenames, classes, and logs to reflect the new `ImageRefinerChatManager` and `ImageRefinerChatScreen` naming scheme.
+
+---
+
 ## [1.2.8] - 2026-06-06
 
 ### 🐛 Bug Fixes & Improvements

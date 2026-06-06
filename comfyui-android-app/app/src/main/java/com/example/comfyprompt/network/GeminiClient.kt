@@ -10,9 +10,15 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 object GeminiClient {
     private val client = OkHttpClient()
+    private val llmClient = client.newBuilder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .build()
     private val gson = Gson()
     private val mediaType = "application/json; charset=utf-8".toMediaType()
 
@@ -62,7 +68,7 @@ object GeminiClient {
                         .addHeader("Content-Type", "application/json")
                         .build()
 
-                    client.newCall(request).execute().use { response ->
+                    llmClient.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
                             AppLogger.e("GeminiClient", "ChatGPT API request failed with HTTP ${response.code}")
@@ -100,7 +106,7 @@ object GeminiClient {
                         .addHeader("Content-Type", "application/json")
                         .build()
 
-                    client.newCall(request).execute().use { response ->
+                    llmClient.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
                             AppLogger.e("GeminiClient", "Grok API request failed with HTTP ${response.code}")
@@ -138,7 +144,7 @@ object GeminiClient {
                         .addHeader("Content-Type", "application/json")
                         .build()
 
-                    client.newCall(request).execute().use { response ->
+                    llmClient.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
                             AppLogger.e("GeminiClient", "Local LLM API request failed with HTTP ${response.code}")
@@ -178,7 +184,7 @@ object GeminiClient {
                         .addHeader("content-type", "application/json")
                         .build()
 
-                    client.newCall(request).execute().use { response ->
+                    llmClient.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
                             AppLogger.e("GeminiClient", "Claude API request failed with HTTP ${response.code}")
@@ -232,7 +238,7 @@ object GeminiClient {
                         .post(requestBody)
                         .build()
 
-                    client.newCall(request).execute().use { response ->
+                    llmClient.newCall(request).execute().use { response ->
                         val bodyString = response.body?.string() ?: ""
                         if (!response.isSuccessful) {
                             AppLogger.e("GeminiClient", "Gemini API request failed with HTTP ${response.code}")
@@ -273,7 +279,7 @@ object GeminiClient {
             .build()
             
         try {
-            client.newCall(request).execute().use { response ->
+            llmClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     AppLogger.e("GeminiClient", "Failed to fetch local models with HTTP ${response.code}")
                     return@withContext emptyList()
@@ -298,17 +304,25 @@ object GeminiClient {
         }
     }
 
-    suspend fun chatWithCopilot(
+    suspend fun chatWithRefiner(
         messages: List<com.example.comfyprompt.data.ChatMessage>,
         base64Images: Map<String, String>,
         settings: AppSettings
     ): String = withContext(Dispatchers.IO) {
-        val apiKey = settings.geminiApiKey
-        if (apiKey.isBlank()) {
-            return@withContext "Error: Gemini API key is missing. Please set it in Settings."
+        val provider = settings.apiProvider
+        val apiKey = when (provider) {
+            "ChatGPT" -> settings.chatgptApiKey
+            "Claude" -> settings.claudeApiKey
+            "Grok" -> settings.grokApiKey
+            "Local / Custom" -> "dummy"
+            else -> settings.geminiApiKey
         }
 
-        val systemInstruction = "You are an expert AI Co-Pilot prompt refiner for ComfyUI. " +
+        if (provider != "Local / Custom" && apiKey.isBlank()) {
+            return@withContext "Error: ${provider} API key is missing. Please set it in Settings."
+        }
+
+        val systemInstruction = "You are an expert AI Image Refiner Chat prompt refiner for ComfyUI. " +
                 "The user will provide a generated image, and optionally other images, and describe what they want to change. " +
                 "Your job is to discuss with them and then suggest a new, modified prompt.\n\n" +
                 "Guidelines:\n" +
@@ -318,72 +332,223 @@ object GeminiClient {
                 "REFINED_PROMPT: A beautiful digital painting of a mystical castle, centered, dramatic sunset lighting, high detail\n\n" +
                 "Do not put quotes or backticks around the prompt. Keep the prompt string clean so it can be copied directly."
 
-        val cleanModel = "models/gemini-3.5-flash"
-        val url = "https://generativelanguage.googleapis.com/v1beta/$cleanModel:generateContent?key=$apiKey"
-
-        val contentsList = messages.map { chatMsg ->
-            val parts = mutableListOf<Map<String, Any>>()
-            
-            chatMsg.imageUrls.forEach { imgUrl ->
-                val base64 = base64Images[imgUrl]
-                if (base64 != null) {
-                    val mimeType = if (imgUrl.contains("webp", ignoreCase = true)) "image/webp" 
-                                   else if (imgUrl.contains("jpg", ignoreCase = true) || imgUrl.contains("jpeg", ignoreCase = true)) "image/jpeg"
-                                   else "image/png"
-                    parts.add(mapOf(
-                        "inlineData" to mapOf(
-                            "mimeType" to mimeType,
-                            "data" to base64
-                        )
-                    ))
-                }
-            }
-            
-            parts.add(mapOf("text" to chatMsg.text))
-            
-            mapOf(
-                "role" to if (chatMsg.sender == com.example.comfyprompt.data.MessageSender.USER) "user" else "model",
-                "parts" to parts
-            )
-        }
-
-        val jsonRequest = mapOf(
-            "contents" to contentsList,
-            "systemInstruction" to mapOf(
-                "parts" to listOf(
-                    mapOf("text" to systemInstruction)
-                )
-            )
-        )
-
         try {
-            val jsonRequestBodyString = gson.toJson(jsonRequest)
-            val requestBody = jsonRequestBodyString.toRequestBody(mediaType)
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
+            when (provider) {
+                "ChatGPT", "Grok", "Local / Custom" -> {
+                    val url = when (provider) {
+                        "ChatGPT" -> "https://api.openai.com/v1/chat/completions"
+                        "Grok" -> "https://api.x.ai/v1/chat/completions"
+                        else -> "${settings.localLlmBaseUrl.removeSuffix("/")}/chat/completions"
+                    }
+                    val model = when (provider) {
+                        "ChatGPT" -> settings.chatgptModel
+                        "Grok" -> settings.grokModel
+                        else -> settings.localLlmSelectedModel
+                    }
 
-            client.newCall(request).execute().use { response ->
-                val bodyString = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    AppLogger.e("GeminiClient", "Copilot API request failed with HTTP ${response.code}: $bodyString")
-                    return@withContext "Error: API request failed with HTTP ${response.code}."
-                }
-                
-                val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
-                val candidates = jsonObject.getAsJsonArray("candidates")
-                if (candidates != null && candidates.size() > 0) {
-                    val content = candidates[0].asJsonObject.getAsJsonObject("content")
-                    val parts = content.getAsJsonArray("parts")
-                    if (parts != null && parts.size() > 0) {
-                        return@withContext parts[0].asJsonObject.get("text").asString.trim()
+                    val messagesList = mutableListOf<Map<String, Any>>()
+                    messagesList.add(mapOf("role" to "system", "content" to systemInstruction))
+
+                    messages.forEach { chatMsg ->
+                        val role = if (chatMsg.sender == com.example.comfyprompt.data.MessageSender.USER) "user" else "assistant"
+                        val hasImages = chatMsg.imageUrls.any { base64Images.containsKey(it) }
+
+                        if (hasImages) {
+                            val contentList = mutableListOf<Map<String, Any>>()
+                            contentList.add(mapOf("type" to "text", "text" to chatMsg.text))
+                            chatMsg.imageUrls.forEach { imgUrl ->
+                                val base64 = base64Images[imgUrl]
+                                if (base64 != null) {
+                                    val mimeType = if (imgUrl.contains("webp", ignoreCase = true)) "image/webp" 
+                                                   else if (imgUrl.contains("jpg", ignoreCase = true) || imgUrl.contains("jpeg", ignoreCase = true)) "image/jpeg"
+                                                   else "image/png"
+                                    contentList.add(mapOf(
+                                        "type" to "image_url",
+                                        "image_url" to mapOf(
+                                            "url" to "data:$mimeType;base64,$base64"
+                                        )
+                                    ))
+                                }
+                            }
+                            messagesList.add(mapOf("role" to role, "content" to contentList))
+                        } else {
+                            messagesList.add(mapOf("role" to role, "content" to chatMsg.text))
+                        }
+                    }
+
+                    val jsonRequest = mapOf(
+                        "model" to model,
+                        "messages" to messagesList
+                    )
+
+                    val requestBody = gson.toJson(jsonRequest).toRequestBody(mediaType)
+                    val requestBuilder = Request.Builder()
+                        .url(url)
+                        .post(requestBody)
+                        .addHeader("Content-Type", "application/json")
+
+                    if (provider != "Local / Custom") {
+                        requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+                    }
+
+                    val request = requestBuilder.build()
+                    llmClient.newCall(request).execute().use { response ->
+                        val bodyString = response.body?.string() ?: ""
+                        if (!response.isSuccessful) {
+                            AppLogger.e("GeminiClient", "$provider request failed with HTTP ${response.code}: $bodyString")
+                            return@withContext "Error: Request failed with HTTP ${response.code}."
+                        }
+                        val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
+                        val choices = jsonObject.getAsJsonArray("choices")
+                        if (choices != null && choices.size() > 0) {
+                            val message = choices[0].asJsonObject.getAsJsonObject("message")
+                            if (message != null) {
+                                return@withContext message.get("content").asString.trim()
+                            }
+                        }
+                        "Error: No response from $provider."
                     }
                 }
-                "Error: No response generated by AI."
+                "Claude" -> {
+                    val url = "https://api.anthropic.com/v1/messages"
+                    val model = settings.claudeModel
+
+                    val messagesList = messages.map { chatMsg ->
+                        val role = if (chatMsg.sender == com.example.comfyprompt.data.MessageSender.USER) "user" else "assistant"
+                        val hasImages = chatMsg.imageUrls.any { base64Images.containsKey(it) }
+
+                        if (hasImages) {
+                            val contentList = mutableListOf<Map<String, Any>>()
+                            chatMsg.imageUrls.forEach { imgUrl ->
+                                val base64 = base64Images[imgUrl]
+                                if (base64 != null) {
+                                    val mimeType = if (imgUrl.contains("webp", ignoreCase = true)) "image/webp" 
+                                                   else if (imgUrl.contains("jpg", ignoreCase = true) || imgUrl.contains("jpeg", ignoreCase = true)) "image/jpeg"
+                                                   else "image/png"
+                                    contentList.add(mapOf(
+                                        "type" to "image",
+                                        "source" to mapOf(
+                                            "type" to "base64",
+                                            "media_type" to mimeType,
+                                            "data" to base64
+                                        )
+                                    ))
+                                }
+                            }
+                            contentList.add(mapOf("type" to "text", "text" to chatMsg.text))
+                            mapOf("role" to role, "content" to contentList)
+                        } else {
+                            mapOf("role" to role, "content" to chatMsg.text)
+                        }
+                    }
+
+                    val jsonRequest = mapOf(
+                        "model" to model,
+                        "max_tokens" to 1024,
+                        "system" to systemInstruction,
+                        "messages" to messagesList
+                    )
+
+                    val requestBody = gson.toJson(jsonRequest).toRequestBody(mediaType)
+                    val request = Request.Builder()
+                        .url(url)
+                        .post(requestBody)
+                        .addHeader("x-api-key", apiKey)
+                        .addHeader("anthropic-version", "2023-06-01")
+                        .addHeader("content-type", "application/json")
+                        .build()
+
+                    llmClient.newCall(request).execute().use { response ->
+                        val bodyString = response.body?.string() ?: ""
+                        if (!response.isSuccessful) {
+                            AppLogger.e("GeminiClient", "Claude request failed with HTTP ${response.code}: $bodyString")
+                            return@withContext "Error: Claude request failed with HTTP ${response.code}."
+                        }
+                        val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
+                        val content = jsonObject.getAsJsonArray("content")
+                        if (content != null && content.size() > 0) {
+                            val textObj = content[0].asJsonObject
+                            if (textObj != null) {
+                                return@withContext textObj.get("text").asString.trim()
+                            }
+                        }
+                        "Error: No response from Claude."
+                    }
+                }
+                else -> {
+                    // Gemini
+                    val mappedModel = when (settings.geminiModel.trim()) {
+                        "gemini-flash-lite-3.1", "gemini flash lite 3.1" -> "gemini-3.1-flash-lite"
+                        "gemini-flash-3.5", "gemini flash 3.5" -> "gemini-3.5-flash"
+                        else -> settings.geminiModel
+                    }
+                    val cleanModel = if (mappedModel.contains("/")) mappedModel else "models/$mappedModel"
+                    val url = "https://generativelanguage.googleapis.com/v1beta/$cleanModel:generateContent?key=$apiKey"
+
+                    val contentsList = messages.map { chatMsg ->
+                        val parts = mutableListOf<Map<String, Any>>()
+                        
+                        chatMsg.imageUrls.forEach { imgUrl ->
+                            val base64 = base64Images[imgUrl]
+                            if (base64 != null) {
+                                val mimeType = if (imgUrl.contains("webp", ignoreCase = true)) "image/webp" 
+                                               else if (imgUrl.contains("jpg", ignoreCase = true) || imgUrl.contains("jpeg", ignoreCase = true)) "image/jpeg"
+                                               else "image/png"
+                                parts.add(mapOf(
+                                    "inlineData" to mapOf(
+                                        "mimeType" to mimeType,
+                                        "data" to base64
+                                    )
+                                ))
+                            }
+                        }
+                        
+                        parts.add(mapOf("text" to chatMsg.text))
+                        
+                        mapOf(
+                            "role" to if (chatMsg.sender == com.example.comfyprompt.data.MessageSender.USER) "user" else "model",
+                            "parts" to parts
+                        )
+                    }
+
+                    val jsonRequest = mapOf(
+                        "contents" to contentsList,
+                        "systemInstruction" to mapOf(
+                            "parts" to listOf(
+                                mapOf("text" to systemInstruction)
+                            )
+                        )
+                    )
+
+                    val jsonRequestBodyString = gson.toJson(jsonRequest)
+                    val requestBody = jsonRequestBodyString.toRequestBody(mediaType)
+                    val request = Request.Builder()
+                        .url(url)
+                        .post(requestBody)
+                        .build()
+
+                    llmClient.newCall(request).execute().use { response ->
+                        val bodyString = response.body?.string() ?: ""
+                        if (!response.isSuccessful) {
+                            AppLogger.e("GeminiClient", "Gemini Image Refiner Chat API request failed with HTTP ${response.code}: $bodyString")
+                            return@withContext "Error: API request failed with HTTP ${response.code}."
+                        }
+                        
+                        val jsonObject = gson.fromJson(bodyString, JsonObject::class.java)
+                        val candidates = jsonObject.getAsJsonArray("candidates")
+                        if (candidates != null && candidates.size() > 0) {
+                            val content = candidates[0].asJsonObject.getAsJsonObject("content")
+                            val parts = content.getAsJsonArray("parts")
+                            if (parts != null && parts.size() > 0) {
+                                return@withContext parts[0].asJsonObject.get("text").asString.trim()
+                            }
+                        }
+                        "Error: No response generated by AI."
+                    }
+                }
             }
         } catch (e: Exception) {
-            AppLogger.e("GeminiClient", "Copilot chat request failed: ${e.message}")
+            AppLogger.e("GeminiClient", "Image Refiner Chat request failed", e)
             "Error: ${e.localizedMessage ?: "Unknown error"}"
         }
     }

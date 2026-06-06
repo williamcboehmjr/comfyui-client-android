@@ -402,7 +402,8 @@ object ComfyClient {
                                 state = GenerationState.Completed,
                                 percent = 1f,
                                 finalImage = result.imageUrl,
-                                statusText = "Completed successfully."
+                                statusText = "Completed successfully.",
+                                previews = listOf(result.imageUrl)
                             )
                         }
                     }
@@ -612,15 +613,37 @@ object ComfyClient {
                                 val outputObj = output.asJsonObject
                                 val images = outputObj.getAsJsonArray("images")
                                 if (images != null && images.size() > 0) {
-                                    val filename = images[0].asJsonObject.get("filename").asString
-                                    val imageUrl = "${serverUrl.removeSuffix("/")}/view?filename=$filename&type=output"
-                                    
-                                    val current = progressFlow.value
-                                    
-                                    // Update finalImage candidate dynamically for ANY executed image node
-                                    progressFlow.value = current.copy(
-                                        finalImage = imageUrl
-                                    )
+                                    val newUrls = mutableListOf<String>()
+                                    for (i in 0 until images.size()) {
+                                        val imgVal = images[i]
+                                        if (imgVal != null && imgVal.isJsonObject) {
+                                            val imgObj = imgVal.asJsonObject
+                                            val filename = imgObj.get("filename")?.asString ?: ""
+                                            if (filename.isNotEmpty()) {
+                                                val subfolder = imgObj.get("subfolder")?.let { if (it.isJsonNull) "" else it.asString } ?: ""
+                                                val type = imgObj.get("type")?.let { if (it.isJsonNull) "" else it.asString } ?: "output"
+                                                val url = buildString {
+                                                    append(serverUrl.removeSuffix("/"))
+                                                    append("/view?filename=")
+                                                    append(filename)
+                                                    if (subfolder.isNotEmpty()) {
+                                                        append("&subfolder=")
+                                                        append(subfolder)
+                                                    }
+                                                    append("&type=")
+                                                    append(type)
+                                                }
+                                                newUrls.add(url)
+                                            }
+                                        }
+                                    }
+                                    if (newUrls.isNotEmpty()) {
+                                        val current = progressFlow.value
+                                        progressFlow.value = current.copy(
+                                            finalImage = newUrls.first(),
+                                            previews = current.previews + newUrls
+                                        )
+                                    }
                                 }
                             }
                         }

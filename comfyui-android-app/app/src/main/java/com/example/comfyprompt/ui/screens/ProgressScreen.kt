@@ -5,9 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +26,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.comfyprompt.data.GenerationState
 import com.example.comfyprompt.data.ProgressInfo
@@ -37,6 +45,7 @@ fun ProgressScreen(
 ) {
     val configuration = LocalConfiguration.current
     val isExpandedScreen = configuration.screenWidthDp >= 600
+    var activeFullscreenImage by remember { mutableStateOf<String?>(null) }
 
     val promptSummaryCard = @Composable {
         var isExpanded by remember { mutableStateOf(false) }
@@ -124,25 +133,75 @@ fun ProgressScreen(
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            val currentPreview = progressInfo.upscaleImage ?: progressInfo.baseImage
-            if (currentPreview != null) {
-                AsyncImage(
-                    model = currentPreview,
-                    contentDescription = "Intermediate Preview",
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            val previews = progressInfo.previews
+            val fallback = progressInfo.upscaleImage ?: progressInfo.baseImage ?: progressInfo.finalImage
+            if (previews.size > 1) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.fillMaxSize().padding(4.dp),
+                    contentPadding = PaddingValues(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp)
-                    Text(
-                        "Awaiting Preview Stream...",
-                        fontSize = 12.sp,
-                        color = AccentGray,
-                        fontWeight = FontWeight.Medium
+                    itemsIndexed(previews) { index, imageUrl ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable { activeFullscreenImage = imageUrl }
+                        ) {
+                            AsyncImage(
+                                model = imageUrl,
+                                contentDescription = "Preview #${index + 1}",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            
+                            // Badge
+                            Box(
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .align(Alignment.TopStart)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "#${index + 1}",
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                val singlePreview = previews.firstOrNull() ?: fallback
+                if (singlePreview != null) {
+                    AsyncImage(
+                        model = singlePreview,
+                        contentDescription = "Intermediate Preview",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable { activeFullscreenImage = singlePreview }
                     )
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp)
+                        Text(
+                            "Awaiting Preview Stream...",
+                            fontSize = 12.sp,
+                            color = AccentGray,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -228,6 +287,103 @@ fun ProgressScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 stopButton()
+            }
+        }
+    }
+
+    if (activeFullscreenImage != null) {
+        Dialog(
+            onDismissRequest = { activeFullscreenImage = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.95f))
+            ) {
+                // High-resolution image
+                AsyncImage(
+                    model = activeFullscreenImage,
+                    contentDescription = "Zoomed Preview",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 80.dp, horizontal = 16.dp)
+                        .align(Alignment.Center)
+                )
+
+                // Close Button (Top Right)
+                IconButton(
+                    onClick = { activeFullscreenImage = null },
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(16.dp)
+                        .align(Alignment.TopEnd)
+                        .background(Color.Black.copy(alpha = 0.6f), shape = RoundedCornerShape(50))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close Preview",
+                        tint = Color.White
+                    )
+                }
+
+                // Action Bar (Bottom Center)
+                Row(
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = 24.dp)
+                        .padding(horizontal = 24.dp)
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(Color.Black.copy(alpha = 0.6f), shape = RoundedCornerShape(20.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            activeFullscreenImage?.let { onSaveClick(it) }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Save",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("SAVE TO DEVICE", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+
+                    Button(
+                        onClick = {
+                            activeFullscreenImage?.let { onShareClick(it) }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("SHARE", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
             }
         }
     }

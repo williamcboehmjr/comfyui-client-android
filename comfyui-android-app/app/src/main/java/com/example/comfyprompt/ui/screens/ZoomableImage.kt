@@ -28,6 +28,8 @@ fun ZoomableImage(
 ) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var isPinching by remember { mutableStateOf(false) }
+
     val state = rememberTransformableState { zoomChange, offsetChange, _ ->
         scale = (scale * zoomChange).coerceIn(1f, 5f)
         if (scale > 1f) {
@@ -40,7 +42,20 @@ fun ZoomableImage(
     Box(
         modifier = modifier
             .clip(shape)
-            .transformable(state = state)
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val activePointers = event.changes.filter { it.pressed }
+                        if (activePointers.size >= 2) {
+                            isPinching = true
+                        } else if (activePointers.isEmpty()) {
+                            isPinching = false
+                        }
+                    }
+                }
+            }
+            .transformable(state = state, enabled = scale > 1f || isPinching)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {

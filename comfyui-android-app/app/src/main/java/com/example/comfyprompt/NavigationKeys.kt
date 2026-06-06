@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object Prompt : NavKey
 @Serializable data object Progress : NavKey
-@Serializable data class Result(val imageUrl: String, val seed: Long) : NavKey
+@Serializable data class Result(val imageUrl: String, val seed: Long, val previews: List<String> = emptyList()) : NavKey
 @Serializable data object Settings : NavKey
 @Serializable data object Gallery : NavKey
 @Serializable data object Logs : NavKey

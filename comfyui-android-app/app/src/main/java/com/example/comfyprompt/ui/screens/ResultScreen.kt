@@ -8,10 +8,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,18 +43,44 @@ import com.example.comfyprompt.theme.SuccessGreen
 fun ResultScreen(
     finalImageUrl: String,
     seed: Long,
+    previews: List<String> = emptyList(),
     settings: AppSettings,
-    onSaveClick: () -> Unit,
-    onShareClick: () -> Unit,
+    onSaveClick: (String) -> Unit,
+    onShareClick: (String) -> Unit,
     onReRunClick: () -> Unit,
     onUsePromptClick: (String) -> Unit,
     viewModel: com.example.comfyprompt.ui.MainViewModel
 ) {
     var isFullScreen by remember { mutableStateOf(false) }
+    val previewsList = remember(previews, finalImageUrl) {
+        if (previews.isNotEmpty()) previews else listOf(finalImageUrl)
+    }
+    val initialIndex = remember(previewsList, finalImageUrl) {
+        previewsList.indexOf(finalImageUrl).coerceAtLeast(0)
+    }
+    var activeIndex by remember(initialIndex) { mutableStateOf(initialIndex) }
+    val currentActiveImageUrl = previewsList.getOrNull(activeIndex) ?: finalImageUrl
+
+    val pagerState = rememberPagerState(
+        initialPage = initialIndex,
+        pageCount = { previewsList.size }
+    )
+
+    // Sync pager scroll to activeIndex changes (e.g. from fullscreen exit)
+    LaunchedEffect(activeIndex) {
+        if (pagerState.currentPage != activeIndex) {
+            pagerState.scrollToPage(activeIndex)
+        }
+    }
+
+    // Sync activeIndex to pager scroll changes
+    LaunchedEffect(pagerState.currentPage) {
+        activeIndex = pagerState.currentPage
+    }
     var isChatOpen by remember { mutableStateOf(false) }
     var attachedUris by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
-    val messages by viewModel.copilotMessages.collectAsState()
-    val isCopilotLoading by viewModel.isCopilotLoading.collectAsState()
+    val messages by viewModel.refinerMessages.collectAsState()
+    val isRefinerLoading by viewModel.isRefinerLoading.collectAsState()
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isExpandedScreen = configuration.screenWidthDp >= 600
@@ -108,7 +139,7 @@ fun ResultScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            viewModel.clearCopilotChat()
+            viewModel.clearRefinerChat()
         }
     }
 
@@ -128,7 +159,7 @@ fun ResultScreen(
 
     val shareButton = @Composable {
         OutlinedButton(
-            onClick = onShareClick,
+            onClick = { onShareClick(currentActiveImageUrl) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -142,28 +173,28 @@ fun ResultScreen(
 
     val saveButton = @Composable {
         Button(
-            onClick = onSaveClick,
+            onClick = { onSaveClick(currentActiveImageUrl) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.Black
-            ),
+              ),
             shape = RoundedCornerShape(28.dp)
         ) {
             Text("DOWNLOAD", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 16.sp)
         }
     }
 
-    val copilotButton = @Composable {
+    val refinerButton = @Composable {
         Button(
             onClick = {
                 isChatOpen = !isChatOpen
                 if (isChatOpen) {
-                    viewModel.initCopilotChat()
+                    viewModel.initRefinerChat()
                 } else {
-                    viewModel.clearCopilotChat()
+                    viewModel.clearRefinerChat()
                 }
             },
             modifier = Modifier
@@ -194,19 +225,49 @@ fun ResultScreen(
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            ZoomableImage(
-                model = finalImageUrl,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-                onTap = { isFullScreen = true }
-            )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                val imageUrl = previewsList.getOrNull(page) ?: finalImageUrl
+                ZoomableImage(
+                    model = imageUrl,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    onTap = { isFullScreen = true }
+                )
+            }
+
+            // Image index badge/indicator if there are multiple images
+            if (previewsList.size > 1) {
+                Box(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .align(Alignment.TopCenter)
+                        .background(Color.Black.copy(alpha = 0.6f), shape = RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "${activeIndex + 1} / ${previewsList.size}",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        BackHandler(enabled = isFullScreen || isPromptFullScreen) {
-            isFullScreen = false
-            isPromptFullScreen = false
+        BackHandler(enabled = isFullScreen || isPromptFullScreen || isChatOpen) {
+            if (isFullScreen) {
+                isFullScreen = false
+            } else if (isPromptFullScreen) {
+                isPromptFullScreen = false
+            } else if (isChatOpen) {
+                isChatOpen = false
+                viewModel.clearRefinerChat()
+            }
         }
 
         Scaffold(
@@ -251,7 +312,7 @@ fun ResultScreen(
                                 }
                                 Box(modifier = Modifier.weight(1f)) {
                                     OutlinedButton(
-                                        onClick = onShareClick,
+                                        onClick = { onShareClick(currentActiveImageUrl) },
                                         modifier = Modifier.fillMaxSize(),
                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                                         border = BorderStroke(1.dp, Color.White),
@@ -263,7 +324,7 @@ fun ResultScreen(
                                 }
                                 Box(modifier = Modifier.weight(1.2f)) {
                                     Button(
-                                        onClick = onSaveClick,
+                                        onClick = { onSaveClick(currentActiveImageUrl) },
                                         modifier = Modifier.fillMaxSize(),
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
                                         shape = RoundedCornerShape(25.dp),
@@ -275,17 +336,17 @@ fun ResultScreen(
                             }
                         }
 
-                        CopilotChatPanel(
+                        ImageRefinerChatPanel(
                             messages = messages,
-                            isLoading = isCopilotLoading,
+                            isLoading = isRefinerLoading,
                             onSendMessage = { txt, uris ->
-                                viewModel.sendCopilotMessage(context, txt, finalImageUrl, uris)
+                                viewModel.sendRefinerMessage(context, txt, currentActiveImageUrl, uris)
                                 attachedUris = emptyList()
                             },
                             onUsePromptClick = onUsePromptClick,
                             onCloseChat = {
                                 isChatOpen = false
-                                viewModel.clearCopilotChat()
+                                viewModel.clearRefinerChat()
                             },
                             attachedUris = attachedUris,
                             onAddAttachment = { uri -> attachedUris = attachedUris + uri },
@@ -323,7 +384,7 @@ fun ResultScreen(
                             reRunButton()
                             shareButton()
                             if (settings.enableEnhancer) {
-                                copilotButton()
+                                refinerButton()
                             }
                             enhancedPromptCard()
                             Spacer(modifier = Modifier.height(16.dp))
@@ -357,17 +418,17 @@ fun ResultScreen(
                             imageCanvas()
                         }
 
-                        CopilotChatPanel(
+                        ImageRefinerChatPanel(
                             messages = messages,
-                            isLoading = isCopilotLoading,
+                            isLoading = isRefinerLoading,
                             onSendMessage = { txt, uris ->
-                                viewModel.sendCopilotMessage(context, txt, finalImageUrl, uris)
+                                viewModel.sendRefinerMessage(context, txt, currentActiveImageUrl, uris)
                                 attachedUris = emptyList()
                             },
                             onUsePromptClick = onUsePromptClick,
                             onCloseChat = {
                                 isChatOpen = false
-                                viewModel.clearCopilotChat()
+                                viewModel.clearRefinerChat()
                             },
                             attachedUris = attachedUris,
                             onAddAttachment = { uri -> attachedUris = attachedUris + uri },
@@ -426,7 +487,7 @@ fun ResultScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Box(modifier = Modifier.weight(1f)) {
-                                    copilotButton()
+                                    refinerButton()
                                 }
                                 Box(modifier = Modifier.weight(1f)) {
                                     saveButton()
@@ -460,19 +521,67 @@ fun ResultScreen(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
+            val fullscreenPagerState = rememberPagerState(
+                initialPage = activeIndex,
+                pageCount = { previewsList.size }
+            )
+            LaunchedEffect(fullscreenPagerState.currentPage) {
+                activeIndex = fullscreenPagerState.currentPage
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                ZoomableImage(
-                    model = finalImageUrl,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                    shape = androidx.compose.ui.graphics.RectangleShape,
-                    onTap = { isFullScreen = false }
-                )
+                HorizontalPager(
+                    state = fullscreenPagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    val imageUrl = previewsList.getOrNull(page) ?: finalImageUrl
+                    ZoomableImage(
+                        model = imageUrl,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        onTap = { isFullScreen = false }
+                    )
+                }
+
+                // Overlay Close and Indicator in Fullscreen
+                IconButton(
+                    onClick = { isFullScreen = false },
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(16.dp)
+                        .align(Alignment.TopEnd)
+                        .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close Fullscreen",
+                        tint = Color.White
+                    )
+                }
+
+                if (previewsList.size > 1) {
+                    Box(
+                        modifier = Modifier
+                            .statusBarsPadding()
+                            .padding(16.dp)
+                            .align(Alignment.TopCenter)
+                            .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "${activeIndex + 1} / ${previewsList.size}",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
 

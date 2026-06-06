@@ -41,7 +41,7 @@ import com.example.comfyprompt.theme.AccentGray
 import com.example.comfyprompt.theme.SuccessGreen
 
 @Composable
-fun CopilotChatPanel(
+fun ImageRefinerChatPanel(
     messages: List<ChatMessage>,
     isLoading: Boolean,
     onSendMessage: (String, List<Uri>) -> Unit,
@@ -86,7 +86,7 @@ fun CopilotChatPanel(
         ) {
             Column {
                 Text(
-                    "PROMPT COPILOT",
+                    "IMAGE REFINER CHAT",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -118,7 +118,7 @@ fun CopilotChatPanel(
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             items(messages) { message ->
-                CopilotMessageItem(
+                ImageRefinerMessageItem(
                     message = message,
                     onUsePromptClick = onUsePromptClick
                 )
@@ -137,7 +137,7 @@ fun CopilotChatPanel(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Copilot is thinking...",
+                            "Image Refiner Chat is thinking...",
                             fontSize = 12.sp,
                             color = AccentGray
                         )
@@ -255,7 +255,7 @@ fun CopilotChatPanel(
 }
 
 @Composable
-fun CopilotMessageItem(
+fun ImageRefinerMessageItem(
     message: ChatMessage,
     onUsePromptClick: (String) -> Unit
 ) {

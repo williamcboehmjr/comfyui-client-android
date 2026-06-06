@@ -89,7 +89,7 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                     // Only auto-navigate to Result if the user was actively watching the Progress screen
                     if (currentScreen is Progress && backStack.lastOrNull() !is Result) {
                         backStack.removeLastOrNull() // Remove Progress screen
-                        backStack.add(Result(finalImage, seed))
+                        backStack.add(Result(finalImage, seed, progressInfo.previews))
                     }
                 }
             }
@@ -182,9 +182,10 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                     ResultScreen(
                         finalImageUrl = key.imageUrl,
                         seed = key.seed,
+                        previews = key.previews,
                         settings = settings,
-                        onSaveClick = { viewModel.saveImageToDownloads(key.imageUrl, settings.outputFormat) },
-                        onShareClick = { viewModel.shareImage(key.imageUrl) },
+                        onSaveClick = { url -> viewModel.saveImageToDownloads(url, settings.outputFormat) },
+                        onShareClick = { url -> viewModel.shareImage(url) },
                         onReRunClick = {
                             viewModel.resetState()
                             // Clear up to Prompt

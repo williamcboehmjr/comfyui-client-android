@@ -3,7 +3,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-purple.svg)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack-Compose-blue.svg)](https://developer.android.com/jetpack/compose)
-[![Version](https://img.shields.io/badge/Version-1.2.8-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.9-orange.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **ComfyUI Client** is a fully native Android app that gives you a clean, touch-friendly mobile interface for your [ComfyUI](https://github.com/comfyanonymous/ComfyUI) image generation server.
@@ -54,8 +54,8 @@ Every successful generation is stored locally. Search by prompt text, tap to vie
 ### 🌐 TRIGGERcmd Server Wake
 If your local ComfyUI PC is off or asleep, the app can fire a [TRIGGERcmd](https://triggercmd.com) cloud relay command to wake it up, then poll until it comes online — no manual intervention needed.
 
-### 🤖 Vision Refiner (Gemini Multimodal)
-Attach reference images and have a back-and-forth Gemini conversation to refine your prompt before generating. Dictation support included.
+### 🤖 Image Refiner Chat (Gemini Multimodal)
+Attach reference images and have a back-and-forth conversation to refine your prompt before generating. Dictation support included.
 
 ---
 

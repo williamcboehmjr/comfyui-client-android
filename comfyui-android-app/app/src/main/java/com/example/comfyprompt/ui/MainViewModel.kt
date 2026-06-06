@@ -10,7 +10,7 @@ import com.example.comfyprompt.data.AppSettings
 import com.example.comfyprompt.data.GalleryItem
 import com.example.comfyprompt.data.GenerationRepository
 import com.example.comfyprompt.data.MediaSaver
-import com.example.comfyprompt.data.CopilotChatManager
+import com.example.comfyprompt.data.ImageRefinerChatManager
 import com.example.comfyprompt.data.SettingsManager
 import com.example.comfyprompt.data.FormatType
 import com.example.comfyprompt.data.ConversionResult
@@ -34,7 +34,7 @@ sealed class ImportState {
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = GenerationRepository.getInstance(application)
-    private val copilotManager = CopilotChatManager()
+    private val refinerManager = ImageRefinerChatManager()
     private val settingsManager = SettingsManager(application)
 
     val settings = repository.settings
@@ -77,25 +77,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    val copilotMessages = copilotManager.copilotMessages
-    val isCopilotLoading = copilotManager.isCopilotLoading
+    val refinerMessages = refinerManager.chatMessages
+    val isRefinerLoading = refinerManager.isChatLoading
 
-    fun initCopilotChat() {
-        copilotManager.initCopilotChat()
+    fun initRefinerChat() {
+        refinerManager.initChat()
     }
 
-    fun clearCopilotChat() {
-        copilotManager.clearCopilotChat()
+    fun clearRefinerChat() {
+        refinerManager.clearChat()
     }
 
-    fun sendCopilotMessage(
+    fun sendRefinerMessage(
         context: Context,
         text: String,
         generatedImageUrl: String,
         attachedUris: List<Uri>
     ) {
         viewModelScope.launch {
-            copilotManager.sendCopilotMessage(context, text, generatedImageUrl, attachedUris, settings.value)
+            refinerManager.sendChatMessage(context, text, generatedImageUrl, attachedUris, settings.value)
         }
     }
 

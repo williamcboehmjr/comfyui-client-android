@@ -2,6 +2,7 @@ package com.example.comfyprompt.ui.screens
 
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -68,6 +71,36 @@ fun GalleryScreen(
                 item.prompt.contains(searchQuery, ignoreCase = true) ||
                 (item.enhancedPrompt?.contains(searchQuery, ignoreCase = true) == true)
             }
+        }
+    }
+
+    val detailsPagerState = rememberPagerState(
+        initialPage = 0,
+        pageCount = { filteredItems.size }
+    )
+
+    // Sync selectedItem to detailsPagerState
+    LaunchedEffect(selectedItem) {
+        if (selectedItem != null) {
+            val targetIndex = filteredItems.indexOf(selectedItem)
+            if (targetIndex >= 0 && detailsPagerState.currentPage != targetIndex) {
+                detailsPagerState.scrollToPage(targetIndex)
+            }
+        }
+    }
+
+    // Sync detailsPagerState.currentPage back to selectedItem
+    LaunchedEffect(detailsPagerState.currentPage) {
+        if (selectedItem != null && detailsPagerState.currentPage in filteredItems.indices) {
+            selectedItem = filteredItems[detailsPagerState.currentPage]
+        }
+    }
+
+    BackHandler(enabled = isFullScreen || selectedItem != null) {
+        if (isFullScreen) {
+            isFullScreen = false
+        } else {
+            selectedItem = null
         }
     }
 
@@ -217,240 +250,255 @@ fun GalleryScreen(
                                 }
                             }
 
-                            // Responsive content
-                            if (isExpandedScreen) {
-                                Row(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    // Left side: large image preview
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1.2f)
-                                            .fillMaxHeight()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.surface)
-                                            .clickable { isFullScreen = true },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        AsyncImage(
-                                            model = item.imageUrl,
-                                            contentDescription = "Zoomed Gallery Preview",
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    }
-
-                                    // Right side: Text details inside scrollable container
+                            // Swipeable content and action buttons
+                            HorizontalPager(
+                                state = detailsPagerState,
+                                modifier = Modifier.weight(1f),
+                                pageSpacing = 16.dp
+                            ) { page ->
+                                val pageItem = filteredItems.getOrNull(page)
+                                if (pageItem != null) {
                                     Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight()
-                                            .verticalScroll(rememberScrollState()),
-                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.spacedBy(14.dp)
                                     ) {
-                                        GalleryDetailsContent(item, clipboardManager, context)
-                                    }
-                                }
-                            } else {
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
-                                        .verticalScroll(rememberScrollState()),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(260.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.surface)
-                                            .clickable { isFullScreen = true },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        AsyncImage(
-                                            model = item.imageUrl,
-                                            contentDescription = "Zoomed Gallery Preview",
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    }
-                                    GalleryDetailsContent(item, clipboardManager, context)
-                                }
-                            }
-
-                            // Responsive Action buttons at the bottom
-                            if (isExpandedScreen) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            onDeleteClick(item.id)
-                                            selectedItem = null
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = Color.White),
-                                        shape = RoundedCornerShape(20.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Delete", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = { onShareClick(item.imageUrl) },
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                        border = BorderStroke(1.dp, Color.White),
-                                        shape = RoundedCornerShape(20.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Share", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = { onDownloadClick(item.imageUrl) },
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                        border = BorderStroke(1.dp, Color.White),
-                                        shape = RoundedCornerShape(20.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(Icons.Default.Download, contentDescription = "Download", modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Save", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            onReRunClick(item.prompt)
-                                            selectedItem = null
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
-                                        shape = RoundedCornerShape(20.dp),
-                                        modifier = Modifier.weight(1.2f)
-                                    ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Load Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-
-                                    if (enableEnhancer) {
-                                        Button(
-                                            onClick = {
-                                                onRefinePromptClick(item.imageUrl, item.seed)
-                                                selectedItem = null
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White),
-                                            shape = RoundedCornerShape(20.dp),
-                                            modifier = Modifier.weight(1.2f)
-                                        ) {
-                                            Icon(Icons.Default.Star, contentDescription = "Refine", modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Refine Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                            } else {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    if (enableEnhancer) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Button(
-                                                onClick = {
-                                                    onReRunClick(item.prompt)
-                                                    selectedItem = null
-                                                },
-                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
-                                                shape = RoundedCornerShape(20.dp),
-                                                modifier = Modifier.weight(1f)
+                                        // Responsive content
+                                        if (isExpandedScreen) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp)
                                             ) {
-                                                Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Load Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                // Left side: large image preview
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1.2f)
+                                                        .fillMaxHeight()
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .background(MaterialTheme.colorScheme.surface)
+                                                        .clickable { isFullScreen = true },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    AsyncImage(
+                                                        model = pageItem.imageUrl,
+                                                        contentDescription = "Zoomed Gallery Preview",
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Fit
+                                                    )
+                                                }
+
+                                                // Right side: Text details inside scrollable container
+                                                Column(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .fillMaxHeight()
+                                                        .verticalScroll(rememberScrollState()),
+                                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    GalleryDetailsContent(pageItem, clipboardManager, context)
+                                                }
                                             }
-
-                                            Button(
-                                                onClick = {
-                                                    onRefinePromptClick(item.imageUrl, item.seed)
-                                                    selectedItem = null
-                                                },
-                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White),
-                                                shape = RoundedCornerShape(20.dp),
-                                                modifier = Modifier.weight(1.1f)
+                                        } else {
+                                            Column(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .fillMaxWidth()
+                                                    .verticalScroll(rememberScrollState()),
+                                                verticalArrangement = Arrangement.spacedBy(12.dp)
                                             ) {
-                                                Icon(Icons.Default.Star, contentDescription = "Refine", modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Refine Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(260.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .background(MaterialTheme.colorScheme.surface)
+                                                        .clickable { isFullScreen = true },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    AsyncImage(
+                                                        model = pageItem.imageUrl,
+                                                        contentDescription = "Zoomed Gallery Preview",
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Fit
+                                                    )
+                                                }
+                                                GalleryDetailsContent(pageItem, clipboardManager, context)
                                             }
                                         }
-                                    } else {
-                                        Button(
-                                            onClick = {
-                                                onReRunClick(item.prompt)
-                                                selectedItem = null
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
-                                            shape = RoundedCornerShape(20.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Load Prompt", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
 
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = { onShareClick(item.imageUrl) },
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                            border = BorderStroke(1.dp, Color.White),
-                                            shape = RoundedCornerShape(20.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Share", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
+                                        // Responsive Action buttons at the bottom
+                                        if (isExpandedScreen) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Button(
+                                                    onClick = {
+                                                        onDeleteClick(pageItem.id)
+                                                        selectedItem = null
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = Color.White),
+                                                    shape = RoundedCornerShape(20.dp),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Delete", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                }
 
-                                        OutlinedButton(
-                                            onClick = { onDownloadClick(item.imageUrl) },
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                            border = BorderStroke(1.dp, Color.White),
-                                            shape = RoundedCornerShape(20.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(Icons.Default.Download, contentDescription = "Download", modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Save", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
+                                                OutlinedButton(
+                                                    onClick = { onShareClick(pageItem.imageUrl) },
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                                    border = BorderStroke(1.dp, Color.White),
+                                                    shape = RoundedCornerShape(20.dp),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Share", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                }
 
-                                        Button(
-                                            onClick = {
-                                                onDeleteClick(item.id)
-                                                selectedItem = null
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = Color.White),
-                                            shape = RoundedCornerShape(20.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Delete", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                OutlinedButton(
+                                                    onClick = { onDownloadClick(pageItem.imageUrl) },
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                                    border = BorderStroke(1.dp, Color.White),
+                                                    shape = RoundedCornerShape(20.dp),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(Icons.Default.Download, contentDescription = "Download", modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Save", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                }
+
+                                                Button(
+                                                    onClick = {
+                                                        onReRunClick(pageItem.prompt)
+                                                        selectedItem = null
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
+                                                    shape = RoundedCornerShape(20.dp),
+                                                    modifier = Modifier.weight(1.2f)
+                                                ) {
+                                                    Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Load Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                }
+
+                                                if (enableEnhancer) {
+                                                    Button(
+                                                        onClick = {
+                                                            onRefinePromptClick(pageItem.imageUrl, pageItem.seed)
+                                                            selectedItem = null
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White),
+                                                        shape = RoundedCornerShape(20.dp),
+                                                        modifier = Modifier.weight(1.2f)
+                                                    ) {
+                                                        Icon(Icons.Default.Star, contentDescription = "Refine", modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Refine Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Column(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                if (enableEnhancer) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Button(
+                                                            onClick = {
+                                                                onReRunClick(pageItem.prompt)
+                                                                selectedItem = null
+                                                            },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
+                                                            shape = RoundedCornerShape(20.dp),
+                                                            modifier = Modifier.weight(1f)
+                                                        ) {
+                                                            Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
+                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                            Text("Load Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                        }
+
+                                                        Button(
+                                                            onClick = {
+                                                                onRefinePromptClick(pageItem.imageUrl, pageItem.seed)
+                                                                selectedItem = null
+                                                            },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White),
+                                                            shape = RoundedCornerShape(20.dp),
+                                                            modifier = Modifier.weight(1.1f)
+                                                        ) {
+                                                            Icon(Icons.Default.Star, contentDescription = "Refine", modifier = Modifier.size(16.dp))
+                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                            Text("Refine Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
+                                                } else {
+                                                    Button(
+                                                        onClick = {
+                                                            onReRunClick(pageItem.prompt)
+                                                            selectedItem = null
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
+                                                        shape = RoundedCornerShape(20.dp),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Icon(Icons.Default.Refresh, contentDescription = "Re-run", modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Load Prompt", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    OutlinedButton(
+                                                        onClick = { onShareClick(pageItem.imageUrl) },
+                                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                                        border = BorderStroke(1.dp, Color.White),
+                                                        shape = RoundedCornerShape(20.dp),
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Share", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    OutlinedButton(
+                                                        onClick = { onDownloadClick(pageItem.imageUrl) },
+                                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                                        border = BorderStroke(1.dp, Color.White),
+                                                        shape = RoundedCornerShape(20.dp),
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        Icon(Icons.Default.Download, contentDescription = "Download", modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Save", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    Button(
+                                                        onClick = {
+                                                            onDeleteClick(pageItem.id)
+                                                            selectedItem = null
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = Color.White),
+                                                        shape = RoundedCornerShape(20.dp),
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Delete", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -467,21 +515,74 @@ fun GalleryScreen(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            val item = selectedItem
-            if (item != null) {
-                Box(
+            val initialIndex = remember { filteredItems.indexOf(selectedItem).coerceAtLeast(0) }
+            val pagerState = rememberPagerState(
+                initialPage = initialIndex,
+                pageCount = { filteredItems.size }
+            )
+
+            // Sync page changes back to selectedItem
+            LaunchedEffect(pagerState.currentPage) {
+                if (pagerState.currentPage in filteredItems.indices) {
+                    selectedItem = filteredItems[pagerState.currentPage]
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    val pageItem = filteredItems.getOrNull(page)
+                    if (pageItem != null) {
+                        ZoomableImage(
+                            model = pageItem.imageUrl,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                            shape = androidx.compose.ui.graphics.RectangleShape,
+                            onTap = { isFullScreen = false }
+                        )
+                    }
+                }
+
+                // Close Button overlay in fullscreen
+                IconButton(
+                    onClick = { isFullScreen = false },
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center
+                        .statusBarsPadding()
+                        .padding(16.dp)
+                        .align(Alignment.TopEnd)
+                        .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(50))
                 ) {
-                    ZoomableImage(
-                        model = item.imageUrl,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                        shape = androidx.compose.ui.graphics.RectangleShape,
-                        onTap = { isFullScreen = false }
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close Fullscreen",
+                        tint = Color.White
                     )
+                }
+
+                // Number Indicator Overlay if there are multiple items
+                if (filteredItems.size > 1) {
+                    Box(
+                        modifier = Modifier
+                            .statusBarsPadding()
+                            .padding(16.dp)
+                            .align(Alignment.TopCenter)
+                            .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "${pagerState.currentPage + 1} / ${filteredItems.size}",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

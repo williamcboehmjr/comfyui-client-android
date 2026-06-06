@@ -12,19 +12,19 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-class CopilotChatManager {
+class ImageRefinerChatManager {
 
-    private val _copilotMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
-    val copilotMessages: StateFlow<List<ChatMessage>> = _copilotMessages.asStateFlow()
+    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
 
-    private val _isCopilotLoading = MutableStateFlow(false)
-    val isCopilotLoading: StateFlow<Boolean> = _isCopilotLoading.asStateFlow()
+    private val _isChatLoading = MutableStateFlow(false)
+    val isChatLoading: StateFlow<Boolean> = _isChatLoading.asStateFlow()
 
-    private val copilotImageBase64Cache = mutableMapOf<String, String>()
+    private val imageBase64Cache = mutableMapOf<String, String>()
 
-    fun initCopilotChat() {
-        if (_copilotMessages.value.isEmpty()) {
-            _copilotMessages.value = listOf(
+    fun initChat() {
+        if (_chatMessages.value.isEmpty()) {
+            _chatMessages.value = listOf(
                 ChatMessage(
                     sender = MessageSender.AI,
                     text = "Hi! I'm your Prompt Refiner Assistant. I've analyzed your generated image. Tell me what changes you'd like to make, or upload reference images for context, and I'll help you refine the prompt!"
@@ -33,12 +33,12 @@ class CopilotChatManager {
         }
     }
 
-    fun clearCopilotChat() {
-        _copilotMessages.value = emptyList()
-        copilotImageBase64Cache.clear()
+    fun clearChat() {
+        _chatMessages.value = emptyList()
+        imageBase64Cache.clear()
     }
 
-    suspend fun sendCopilotMessage(
+    suspend fun sendChatMessage(
         context: Context,
         text: String,
         generatedImageUrl: String,
@@ -47,18 +47,18 @@ class CopilotChatManager {
     ) {
         if (text.isBlank() && attachedUris.isEmpty()) return
 
-        _isCopilotLoading.value = true
+        _isChatLoading.value = true
 
         val imageUrls = mutableListOf<String>()
 
-        val isFirstUserTurn = _copilotMessages.value.none { it.sender == MessageSender.USER }
+        val isFirstUserTurn = _chatMessages.value.none { it.sender == MessageSender.USER }
         if (isFirstUserTurn) {
             imageUrls.add(generatedImageUrl)
-            val cached = copilotImageBase64Cache[generatedImageUrl]
+            val cached = imageBase64Cache[generatedImageUrl]
             if (cached == null) {
                 val base64 = downloadImageAsBase64(generatedImageUrl)
                 if (base64 != null) {
-                    copilotImageBase64Cache[generatedImageUrl] = base64
+                    imageBase64Cache[generatedImageUrl] = base64
                 }
             }
         }
@@ -68,7 +68,7 @@ class CopilotChatManager {
             imageUrls.add(uriString)
             val base64 = getUriAsBase64(context, uri)
             if (base64 != null) {
-                copilotImageBase64Cache[uriString] = base64
+                imageBase64Cache[uriString] = base64
             }
         }
 
@@ -78,10 +78,10 @@ class CopilotChatManager {
             imageUrls = imageUrls
         )
 
-        _copilotMessages.value = _copilotMessages.value + userMessage
+        _chatMessages.value = _chatMessages.value + userMessage
 
-        val allMessages = _copilotMessages.value
-        val responseText = GeminiClient.chatWithCopilot(allMessages, copilotImageBase64Cache, settings)
+        val allMessages = _chatMessages.value
+        val responseText = GeminiClient.chatWithRefiner(allMessages, imageBase64Cache, settings)
 
         val marker = "REFINED_PROMPT:"
         val refinedPrompt = if (responseText.contains(marker)) {
@@ -101,8 +101,8 @@ class CopilotChatManager {
             refinedPrompt = refinedPrompt
         )
 
-        _copilotMessages.value = _copilotMessages.value + aiMessage
-        _isCopilotLoading.value = false
+        _chatMessages.value = _chatMessages.value + aiMessage
+        _isChatLoading.value = false
     }
 
     private suspend fun downloadImageAsBase64(imageUrl: String): String? = withContext(Dispatchers.IO) {
@@ -118,7 +118,7 @@ class CopilotChatManager {
                 }
             }
         } catch (e: Exception) {
-            AppLogger.e("CopilotChatManager", "Failed to download image for base64: ${e.message}")
+            AppLogger.e("ImageRefinerChatManager", "Failed to download image for base64: ${e.message}")
         }
         null
     }
@@ -130,7 +130,7 @@ class CopilotChatManager {
                 android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
             }
         } catch (e: Exception) {
-            AppLogger.e("CopilotChatManager", "Failed to convert URI to base64: ${e.message}")
+            AppLogger.e("ImageRefinerChatManager", "Failed to convert URI to base64: ${e.message}")
             null
         }
     }
