@@ -15,9 +15,9 @@ object WorkflowTransformer {
     internal fun isPositivePrompt(text: String): Boolean {
         val lower = text.lowercase()
         val negativeKeywords = listOf(
-            "bad", "blurry", "lowres", "worst", "quality", "deformed", "watermark", 
-            "logo", "text", "signature", "cropped", "ugly", "error", "mutilated", 
-            "disfigured", "extra limbs", "bad anatomy", "nsfw"
+            "bad", "blurry", "lowres", "deformed", "watermark", 
+            "logo", "signature", "cropped", "ugly", "error", "mutilated", 
+            "disfigured", "extra limbs", "bad anatomy", "nsfw", "worst quality", "low quality"
         )
         if (text.isBlank()) return true
         for (kw in negativeKeywords) {
@@ -65,7 +65,11 @@ object WorkflowTransformer {
             val valEl = inputs.get(key)
             if (valEl != null && valEl.isJsonPrimitive && valEl.asJsonPrimitive.isString) {
                 val existing = valEl.asString
-                if (isPositivePrompt(existing)) {
+                val title = (node.get("title")?.asString 
+                             ?: node.getAsJsonObject("_meta")?.get("title")?.asString 
+                             ?: "").lowercase()
+                val isNegTitle = title.contains("negative") || title.contains("neg")
+                if (!isNegTitle && isPositivePrompt(existing)) {
                     inputs.addProperty(key, prompt)
                     AppLogger.d("WorkflowTransformer", "Recursively overrode direct string in node $nodeId key $key")
                     return true
@@ -102,7 +106,8 @@ object WorkflowTransformer {
         prompt: String,
         settings: AppSettings,
         activeSeed: Long,
-        objectInfo: JsonObject
+        objectInfo: JsonObject,
+        inputImageName: String? = null
     ): Pair<String, String> { // Returns: Pair<TransformedJsonString, SaveImageNodeId>
         var workflowObj = gson.fromJson(rawWorkflowJson, JsonObject::class.java)
 
@@ -242,19 +247,29 @@ object WorkflowTransformer {
             val classType = node.get("class_type")?.asString
             val inputs = node.getAsJsonObject("inputs") ?: return@forEach
 
+            // Input image injection
+            if (classType == "LoadImage" && !inputImageName.isNullOrBlank()) {
+                inputs.addProperty("image", inputImageName)
+                AppLogger.d("WorkflowTransformer", "Injected input image '$inputImageName' into LoadImage node ${entry.key}")
+            }
+
             // Prompt injection
             if (classType == "CLIPTextEncode") {
                 val textVal = inputs.get("text")
                 if (textVal != null) {
-                    val isPos = when {
-                        textVal.isJsonPrimitive && textVal.asJsonPrimitive.isString -> {
-                            isPositivePrompt(textVal.asString)
-                        }
-                        else -> {
-                            val title = node.get("title")?.asString?.lowercase() ?: ""
-                            !title.contains("negative") && !title.contains("neg")
-                        }
+                    val title = (node.get("title")?.asString 
+                                 ?: node.getAsJsonObject("_meta")?.get("title")?.asString 
+                                 ?: "").lowercase()
+                    val isNegTitle = title.contains("negative") || title.contains("neg")
+                    
+                    val isPos = if (isNegTitle) {
+                        false
+                    } else if (textVal.isJsonPrimitive && textVal.asJsonPrimitive.isString) {
+                        isPositivePrompt(textVal.asString)
+                    } else {
+                        true
                     }
+                    
                     if (isPos) {
                         if (overrideTextNode(entry.key, workflowObj, prompt)) {
                             promptInjected = true
@@ -267,7 +282,11 @@ object WorkflowTransformer {
                 classType == "PrimitiveString" || classType == "StringNode" || classType == "DF_Text_Box") {
                 val valEl = inputs.get("value") ?: inputs.get("string") ?: inputs.get("text") ?: inputs.get("Text")
                 if (valEl?.isJsonPrimitive == true && valEl.asJsonPrimitive.isString) {
-                    if (isPositivePrompt(valEl.asString)) {
+                    val title = (node.get("title")?.asString 
+                                 ?: node.getAsJsonObject("_meta")?.get("title")?.asString 
+                                 ?: "").lowercase()
+                    val isNegTitle = title.contains("negative") || title.contains("neg")
+                    if (!isNegTitle && isPositivePrompt(valEl.asString)) {
                         when {
                             inputs.has("value") -> { inputs.addProperty("value", prompt); promptInjected = true }
                             inputs.has("string") -> { inputs.addProperty("string", prompt); promptInjected = true }

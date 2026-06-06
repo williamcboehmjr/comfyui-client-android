@@ -3,6 +3,7 @@ package com.example.comfyprompt.data
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import com.example.comfyprompt.MainActivity
@@ -173,10 +174,12 @@ class GenerationRepository private constructor(private val context: Context) {
         }
     }
 
-    fun queueGeneration(prompt: String) {
+    fun queueGeneration(prompt: String, inputImageUri: Uri? = null, bypassedGroups: List<String> = emptyList()) {
         val job = QueueJob(
             prompt = prompt,
-            settings = _settings.value
+            settings = _settings.value,
+            inputImageUri = inputImageUri?.toString(),
+            bypassedGroups = bypassedGroups
         )
         _queueList.value = _queueList.value + job
         AppLogger.i("GenerationRepository", "Queued job: ${job.id}. Queue size: ${_queueList.value.size}")
@@ -242,7 +245,8 @@ class GenerationRepository private constructor(private val context: Context) {
             job.prompt
         }
 
-        ComfyClient.startGeneration(context, finalPrompt, currentSettings) { generatedSeed ->
+        val imageUri = job.inputImageUri?.let { Uri.parse(it) }
+        ComfyClient.startGeneration(context, finalPrompt, currentSettings, imageUri, job.bypassedGroups) { generatedSeed ->
             val updated = _settings.value.copy(lastUsedSeedValue = generatedSeed)
             updateSettings(updated)
         }

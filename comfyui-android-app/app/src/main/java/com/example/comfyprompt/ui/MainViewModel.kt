@@ -57,6 +57,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _importState = MutableStateFlow<ImportState>(ImportState.Idle)
     val importState: StateFlow<ImportState> = _importState.asStateFlow()
 
+    private val _workflowGroups = MutableStateFlow<List<String>>(emptyList())
+    val workflowGroups: StateFlow<List<String>> = _workflowGroups.asStateFlow()
+
+    private val _bypassedGroups = MutableStateFlow<Set<String>>(emptySet())
+    val bypassedGroups: StateFlow<Set<String>> = _bypassedGroups.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            var lastWorkflow: String? = null
+            var lastServerUrl: String? = null
+            settings.collect { settingsVal ->
+                if (settingsVal.workflowToUse != lastWorkflow || settingsVal.serverUrl != lastServerUrl) {
+                    lastWorkflow = settingsVal.workflowToUse
+                    lastServerUrl = settingsVal.serverUrl
+                    loadWorkflowGroups(getApplication(), settingsVal.workflowToUse, settingsVal.serverUrl)
+                }
+            }
+        }
+    }
+
     val copilotMessages = copilotManager.copilotMessages
     val isCopilotLoading = copilotManager.isCopilotLoading
 
@@ -92,7 +112,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.updateSettings(newSettings)
     }
 
-    fun generateImage(prompt: String) {
+    fun generateImage(prompt: String, inputImageUri: Uri? = null) {
         if (_generateCooldownSeconds.value > 0) {
             AppLogger.w("MainViewModel", "Generate image blocked: active cooldown is ${_generateCooldownSeconds.value} seconds.")
             return
@@ -108,7 +128,86 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _currentPrompt.value = prompt
-        repository.queueGeneration(prompt)
+        repository.queueGeneration(prompt, inputImageUri, _bypassedGroups.value.toList())
+    }
+
+    fun loadWorkflowGroups(context: Context, workflowToUse: String, serverUrl: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonStr = if (workflowToUse == "imported_workflow.json") {
+                    try {
+                        context.openFileInput("imported_workflow.json").bufferedReader().use { it.readText() }
+                    } catch (e: Exception) { null }
+                } else if (workflowToUse.isNotBlank()) {
+                    val cleanUrl = serverUrl.removeSuffix("/")
+                    val encodedPath = java.net.URLEncoder.encode("workflows/$workflowToUse", "UTF-8").replace("+", "%20")
+                    val url = "$cleanUrl/userdata/$encodedPath"
+                    val request = okhttp3.Request.Builder().url(url).build()
+                    try {
+                        ComfyClient.client.newCall(request).execute().use { response ->
+                            if (response.isSuccessful) response.body?.string() else null
+                        }
+                    } catch (e: Exception) { null }
+                } else {
+                    try {
+                        context.assets.open("ernie_workflow.json").use {
+                            java.io.InputStreamReader(it).readText()
+                        }
+                    } catch (e: Exception) { null }
+                }
+
+                if (!jsonStr.isNullOrBlank()) {
+                    val element = com.google.gson.JsonParser.parseString(jsonStr)
+                    if (element.isJsonObject) {
+                        val obj = element.asJsonObject
+                        if (obj.has("groups")) {
+                            val groupsArr = obj.getAsJsonArray("groups")
+                            val titles = mutableListOf<String>()
+                            groupsArr.forEach { groupEl ->
+                                if (groupEl.isJsonObject) {
+                                    val groupObj = groupEl.asJsonObject
+                                    val title = groupObj.get("title")?.asString
+                                    if (!title.isNullOrBlank()) {
+                                        titles.add(title)
+                                    }
+                                }
+                            }
+                            _workflowGroups.value = titles
+                            val titlesSet = titles.toSet()
+                            _bypassedGroups.value = titlesSet
+                            return@launch
+                        }
+                    }
+                }
+                _workflowGroups.value = emptyList()
+                _bypassedGroups.value = emptySet()
+            } catch (e: Exception) {
+                AppLogger.e("MainViewModel", "Error loading workflow groups: ${e.localizedMessage}")
+                _workflowGroups.value = emptyList()
+                _bypassedGroups.value = emptySet()
+            }
+        }
+    }
+
+    fun toggleGroupBypass(groupTitle: String) {
+        val current = _bypassedGroups.value
+        _bypassedGroups.value = if (current.contains(groupTitle)) {
+            current - groupTitle
+        } else {
+            current + groupTitle
+        }
+    }
+
+    fun toggleAllGroups(enableAll: Boolean) {
+        _bypassedGroups.value = if (enableAll) {
+            emptySet()
+        } else {
+            _workflowGroups.value.toSet()
+        }
+    }
+
+    fun clearBypassedGroups() {
+        _bypassedGroups.value = emptySet()
     }
 
     fun fetchLocalModels(baseUrl: String) {

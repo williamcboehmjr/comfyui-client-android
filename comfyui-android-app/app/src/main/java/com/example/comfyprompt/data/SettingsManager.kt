@@ -134,7 +134,8 @@ class SettingsManager(context: Context) {
             triggerCmdEnabled = prefs.getBoolean("trigger_cmd_enabled", false),
             triggerCmdToken = getSensitiveKey("trigger_cmd_token", ""),
             triggerCmdName = prefs.getString("trigger_cmd_name", "Comfy_Start") ?: "Comfy_Start",
-            triggerCmdComputer = prefs.getString("trigger_cmd_computer", "") ?: ""
+            triggerCmdComputer = prefs.getString("trigger_cmd_computer", "") ?: "",
+            selectedStylePreset = ""
         )
     }
 

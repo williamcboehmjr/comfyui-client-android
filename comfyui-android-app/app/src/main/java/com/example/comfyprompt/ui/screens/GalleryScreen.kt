@@ -58,6 +58,18 @@ fun GalleryScreen(
     var isFullScreen by remember { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredItems = remember(items, searchQuery) {
+        if (searchQuery.isBlank()) {
+            items
+        } else {
+            items.filter { item ->
+                item.prompt.contains(searchQuery, ignoreCase = true) ||
+                (item.enhancedPrompt?.contains(searchQuery, ignoreCase = true) == true)
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -74,46 +86,90 @@ fun GalleryScreen(
             },
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
-            if (items.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                if (items.isNotEmpty()) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search creations...", color = AccentGray) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AccentGray) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = AccentGray)
+                                }
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                if (items.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Image, contentDescription = "Empty History", tint = AccentGray, modifier = Modifier.size(64.dp))
+                            Text("No past creations found.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Your successful generations will appear here.", color = AccentGray, fontSize = 13.sp)
+                        }
+                    }
+                } else if (filteredItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = "No Results", tint = AccentGray, modifier = Modifier.size(64.dp))
+                            Text("No matching creations.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Try searching for different keywords.", color = AccentGray, fontSize = 13.sp)
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(columnsCount),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.Image, contentDescription = "Empty History", tint = AccentGray, modifier = Modifier.size(64.dp))
-                        Text("No past creations found.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Your successful generations will appear here.", color = AccentGray, fontSize = 13.sp)
-                    }
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(columnsCount),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(items, key = { it.id }) { item ->
-                        Box(
-                            modifier = Modifier
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .clickable { selectedItem = item }
-                        ) {
-                            AsyncImage(
-                                model = item.imageUrl,
-                                contentDescription = item.prompt,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
+                        items(filteredItems, key = { it.id }) { item ->
+                            Box(
+                                modifier = Modifier
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { selectedItem = item }
+                            ) {
+                                AsyncImage(
+                                    model = item.imageUrl,
+                                    contentDescription = item.prompt,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                         }
                     }
                 }

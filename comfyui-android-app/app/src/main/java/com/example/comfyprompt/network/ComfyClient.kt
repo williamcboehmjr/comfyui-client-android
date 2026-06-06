@@ -1,6 +1,7 @@
 package com.example.comfyprompt.network
 
 import android.content.Context
+import android.net.Uri
 import com.example.comfyprompt.data.AppSettings
 import com.example.comfyprompt.data.ConversionResult
 import com.example.comfyprompt.data.GenerationState
@@ -17,6 +18,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.io.InputStreamReader
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -79,10 +81,167 @@ object ComfyClient {
         }
     }
 
+    private fun getCachedObjectInfo(context: Context, serverUrl: String): JsonObject? {
+        return try {
+            val urlFile = File(context.filesDir, "object_info_url.txt")
+            val cacheFile = File(context.filesDir, "object_info_cache.json")
+            if (urlFile.exists() && cacheFile.exists()) {
+                val cachedUrl = urlFile.readText().trim()
+                if (cachedUrl == serverUrl.trim()) {
+                    AppLogger.d("ComfyClient", "Loading object_info from local disk cache")
+                    val cachedJson = cacheFile.readText()
+                    gson.fromJson(cachedJson, JsonObject::class.java)
+                } else null
+            } else null
+        } catch (e: Exception) {
+            AppLogger.e("ComfyClient", "Error reading cached object_info: ${e.localizedMessage}")
+            null
+        }
+    }
+
+    private fun saveObjectInfoToCache(context: Context, serverUrl: String, jsonStr: String) {
+        try {
+            val urlFile = File(context.filesDir, "object_info_url.txt")
+            val cacheFile = File(context.filesDir, "object_info_cache.json")
+            urlFile.writeText(serverUrl.trim())
+            cacheFile.writeText(jsonStr)
+            AppLogger.d("ComfyClient", "Saved object_info to local disk cache")
+        } catch (e: Exception) {
+            AppLogger.e("ComfyClient", "Error saving object_info to cache: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun uploadImage(serverUrl: String, imageUri: Uri, context: Context): String = withContext(Dispatchers.IO) {
+        val inputStream = context.contentResolver.openInputStream(imageUri) ?: throw java.io.IOException("Unable to open input stream for image Uri")
+        val bytes = inputStream.readBytes()
+        inputStream.close()
+
+        val fileName = try {
+            context.contentResolver.query(imageUri, arrayOf(android.provider.MediaStore.Images.Media.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(android.provider.MediaStore.Images.Media.DISPLAY_NAME)
+                    if (idx != -1) cursor.getString(idx) else null
+                } else null
+            }
+        } catch (e: Exception) {
+            null
+        } ?: "upload_${System.currentTimeMillis()}.png"
+
+        val mediaType = "image/png".toMediaType()
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("image", fileName, bytes.toRequestBody(mediaType))
+            .addFormDataPart("overwrite", "true")
+            .build()
+
+        val uploadUrl = "${serverUrl.removeSuffix("/")}/upload/image"
+        val request = Request.Builder()
+            .url(uploadUrl)
+            .post(requestBody)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                throw java.io.IOException("Failed to upload image (HTTP ${response.code}): $body")
+            }
+            val json = gson.fromJson(body, JsonObject::class.java)
+            json.get("name")?.asString ?: throw java.io.IOException("Invalid upload response")
+        }
+    }
+
+    private fun getStageFromClassType(classType: String): String {
+        val lower = classType.lowercase()
+        return when {
+            lower.contains("checkpoint") || lower.contains("loader") || lower.contains("lora") || lower.contains("clipmerge") -> "Load Model"
+            lower.contains("encode") || lower.contains("latent") || lower.contains("conditioning") -> "Encode"
+            lower.contains("sampler") -> "Sampler"
+            lower.contains("decode") || lower.contains("vae") -> "Decode"
+            lower.contains("save") || lower.contains("preview") || lower.contains("output") -> "Save"
+            else -> ""
+        }
+    }
+
+    private fun bypassGroupsInUiWorkflow(
+        workflowObj: JsonObject,
+        bypassedGroupTitles: List<String>
+    ): JsonObject {
+        try {
+            val groups = workflowObj.getAsJsonArray("groups") ?: return workflowObj
+            val nodes = workflowObj.getAsJsonArray("nodes") ?: return workflowObj
+            val bypassedTitlesSet = bypassedGroupTitles.toSet()
+
+            val allGroups = mutableListOf<JsonObject>()
+            groups.forEach { groupEl ->
+                if (groupEl.isJsonObject) {
+                    allGroups.add(groupEl.asJsonObject)
+                }
+            }
+
+            val bypassedGroups = mutableListOf<JsonObject>()
+            allGroups.forEach { groupObj ->
+                val title = groupObj.get("title")?.asString ?: ""
+                if (bypassedTitlesSet.contains(title)) {
+                    bypassedGroups.add(groupObj)
+                }
+            }
+
+            nodes.forEach { nodeEl ->
+                if (nodeEl.isJsonObject) {
+                    val nodeObj = nodeEl.asJsonObject
+                    val pos = nodeObj.getAsJsonArray("pos")
+                    if (pos != null && pos.size() >= 2) {
+                        val nx = pos[0].asFloat
+                        val ny = pos[1].asFloat
+
+                        val insideBypassed = bypassedGroups.any { groupObj ->
+                            val bounding = groupObj.getAsJsonArray("bounding")
+                            if (bounding != null && bounding.size() >= 4) {
+                                val gx = bounding[0].asFloat
+                                val gy = bounding[1].asFloat
+                                val gw = bounding[2].asFloat
+                                val gh = bounding[3].asFloat
+                                nx >= gx && nx <= gx + gw && ny >= gy && ny <= gy + gh
+                            } else false
+                        }
+
+                        if (insideBypassed) {
+                            // mode = 4 is bypass in ComfyUI / LiteGraph
+                            nodeObj.addProperty("mode", 4)
+                            AppLogger.d("ComfyClient", "Set mode=4 (bypass) for node ID ${nodeObj.get("id")?.asString} in bypassed group")
+                        } else {
+                            val activeGroups = allGroups.filter { !bypassedGroups.contains(it) }
+                            val insideActive = activeGroups.any { groupObj ->
+                                val bounding = groupObj.getAsJsonArray("bounding")
+                                if (bounding != null && bounding.size() >= 4) {
+                                    val gx = bounding[0].asFloat
+                                    val gy = bounding[1].asFloat
+                                    val gw = bounding[2].asFloat
+                                    val gh = bounding[3].asFloat
+                                    nx >= gx && nx <= gx + gw && ny >= gy && ny <= gy + gh
+                                } else false
+                            }
+                            if (insideActive) {
+                                // Explicitly enable the node in case it was saved as bypassed/disabled in the template
+                                nodeObj.addProperty("mode", 0)
+                                AppLogger.d("ComfyClient", "Set mode=0 (active) for node ID ${nodeObj.get("id")?.asString} in active group")
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.e("ComfyClient", "Error bypassing groups: ${e.localizedMessage}")
+        }
+        return workflowObj
+    }
+
     fun startGeneration(
         context: Context,
         prompt: String,
         settings: AppSettings,
+        inputImageUri: Uri? = null,
+        bypassedGroups: List<String> = emptyList(),
         onSeedGenerated: (Long) -> Unit
     ) {
         activeGenerationJob?.cancel()
@@ -131,23 +290,37 @@ object ComfyClient {
 
                 var workflowObj = gson.fromJson(workflowJsonString, JsonObject::class.java)
 
-                // If the workflow is in ComfyUI UI format (has a "nodes" array), convert it to API format
+                // Apply group bypass if we have any bypassed groups and it's a UI-format workflow (has "groups")
+                if (bypassedGroups.isNotEmpty() && workflowObj.has("groups")) {
+                    AppLogger.i("ComfyClient", "Applying bypass to groups: $bypassedGroups")
+                    workflowObj = bypassGroupsInUiWorkflow(workflowObj, bypassedGroups)
+                }
+
+                // Fetch /object_info with cache
                 val serverBase = settings.serverUrl.removeSuffix("/")
                 val objectInfo: JsonObject = try {
-                    val req = Request.Builder().url("$serverBase/object_info").build()
-                    client.newCall(req).execute().use { resp ->
-                        if (resp.isSuccessful) gson.fromJson(resp.body?.string() ?: "{}", JsonObject::class.java)
-                        else JsonObject()
+                    val cached = getCachedObjectInfo(context, settings.serverUrl)
+                    if (cached != null) {
+                        cached
+                    } else {
+                        val req = Request.Builder().url("$serverBase/object_info").build()
+                        client.newCall(req).execute().use { resp ->
+                            if (resp.isSuccessful) {
+                                val bodyStr = resp.body?.string() ?: "{}"
+                                saveObjectInfoToCache(context, settings.serverUrl, bodyStr)
+                                gson.fromJson(bodyStr, JsonObject::class.java)
+                            } else JsonObject()
+                        }
                     }
                 } catch (e: Exception) { JsonObject() }
 
-                var apiJson = workflowJsonString
+                var apiJson = if (workflowObj.has("nodes")) gson.toJson(workflowObj) else workflowJsonString
                 if (workflowObj.has("nodes")) {
                     AppLogger.d("ComfyClient", "Converting UI-format workflow to API format via server endpoint")
                     progressFlow.value = progressFlow.value.copy(
                         statusText = "Converting workflow on server..."
                     )
-                    val conversionResult = convertWorkflowToApi(workflowJsonString, settings.serverUrl)
+                    val conversionResult = convertWorkflowToApi(apiJson, settings.serverUrl)
                     when (conversionResult) {
                         is ConversionResult.Success -> {
                             apiJson = conversionResult.apiJson
@@ -161,12 +334,53 @@ object ComfyClient {
                     }
                 }
 
+                // Build stages map from apiJson
+                val stagesMap = mutableMapOf<String, String>()
+                try {
+                    val apiObj = gson.fromJson(apiJson, JsonObject::class.java)
+                    apiObj.keySet().forEach { key ->
+                        val nodeEl = apiObj.get(key)
+                        if (nodeEl.isJsonObject) {
+                            val nodeObj = nodeEl.asJsonObject
+                            val classType = nodeObj.get("class_type")?.asString
+                            if (classType != null) {
+                                val stage = getStageFromClassType(classType)
+                                if (stage.isNotEmpty()) {
+                                    stagesMap[key] = stage
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e("ComfyClient", "Error building stages map: ${e.localizedMessage}")
+                }
+
+                progressFlow.value = progressFlow.value.copy(
+                    activeNodeStages = stagesMap,
+                    currentStage = ""
+                )
+
+                // Upload input image if Uri is provided
+                var uploadedFilename: String? = null
+                if (inputImageUri != null) {
+                    progressFlow.value = progressFlow.value.copy(
+                        statusText = "Uploading input image..."
+                    )
+                    try {
+                        uploadedFilename = uploadImage(settings.serverUrl, inputImageUri, context)
+                    } catch (e: Exception) {
+                        AppLogger.e("ComfyClient", "Failed to upload input image: ${e.localizedMessage}")
+                        throw Exception("Failed to upload input image: ${e.localizedMessage}")
+                    }
+                }
+
                 val (promptJson, saveImageId) = WorkflowTransformer.transform(
                     apiJson,
                     prompt,
                     settings,
                     activeSeed,
-                    objectInfo
+                    objectInfo,
+                    uploadedFilename
                 )
                 activeSaveImageNodeId = saveImageId
                 AppLogger.d("ComfyClient", "Using SaveImage node: $saveImageId")
@@ -450,14 +664,18 @@ object ComfyClient {
 
     private fun handleNodeExecution(node: String) {
         val current = progressFlow.value
+        val stage = current.activeNodeStages?.get(node)
+        val nextStage = if (!stage.isNullOrEmpty()) stage else current.currentStage
         val nodeName = when (node) {
             "777", "95" -> "Base Generation (ERNIE)"
             else -> "Executing Node $node"
         }
+        val displayStatus = if (!nextStage.isNullOrEmpty()) nextStage else nodeName
         progressFlow.value = current.copy(
             state = GenerationState.GeneratingBase,
             currentNode = node,
-            statusText = nodeName
+            currentStage = nextStage,
+            statusText = displayStatus
         )
     }
 

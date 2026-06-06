@@ -1,35 +1,55 @@
 package com.example.comfyprompt.ui.screens
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.comfyprompt.data.AppSettings
 import com.example.comfyprompt.data.SeedMode
 import com.example.comfyprompt.theme.AccentGray
 import com.example.comfyprompt.theme.AccentRed
 import com.example.comfyprompt.theme.SuccessGreen
+
+data class StylePreset(
+    val name: String,
+    val cue: String,
+    val icon: String
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,13 +57,20 @@ fun PromptScreen(
     prompt: String,
     onPromptChange: (String) -> Unit,
     settings: AppSettings,
-    onGenerateClick: (String) -> Unit,
+    onGenerateClick: (String, Uri?) -> Unit,
     onSettingsClick: () -> Unit,
     onGalleryClick: () -> Unit,
     onEnhancerToggle: (Boolean) -> Unit,
     onSeedModeChange: (SeedMode, Long) -> Unit,
     onMegapixelChange: (String) -> Unit,
     onAspectRatioChange: (String) -> Unit,
+    onStylePresetChange: (String) -> Unit,
+    savedWorkflows: List<String>,
+    onWorkflowChange: (String) -> Unit,
+    workflowGroups: List<String> = emptyList(),
+    bypassedGroups: Set<String> = emptySet(),
+    onToggleGroupBypass: (String) -> Unit = {},
+    onToggleAllGroups: (Boolean) -> Unit = {},
     cooldownSeconds: Int = 0
 ) {
     var seedInput by remember { mutableStateOf(settings.customSeedValue.toString()) }
@@ -51,13 +78,29 @@ fun PromptScreen(
     val configuration = LocalConfiguration.current
     val isExpandedScreen = configuration.screenWidthDp >= 600
 
-    val promptInputCard = @Composable {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(16.dp)
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
+    var showWorkflowSheet by remember { mutableStateOf(false) }
+
+    var workflowExpanded by remember { mutableStateOf(false) }
+    var promptExpanded by remember { mutableStateOf(true) }
+    var stylePresetExpanded by remember { mutableStateOf(false) }
+    var resolutionExpanded by remember { mutableStateOf(false) }
+    var stagesExpanded by remember { mutableStateOf(false) }
+    var inputImageExpanded by remember { mutableStateOf(false) }
+    var seedExpanded by remember { mutableStateOf(false) }
+
+    val promptInputAccordion = @Composable {
+        AccordionSection(
+            title = "PROMPT",
+            isExpanded = promptExpanded,
+            onHeaderClick = { promptExpanded = !promptExpanded }
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -81,7 +124,6 @@ fun PromptScreen(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = prompt,
                     onValueChange = onPromptChange,
@@ -97,23 +139,18 @@ fun PromptScreen(
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-                Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Gemini Prompt Enhancer",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    Text(
+                        text = "Gemini Prompt Enhancer",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     Switch(
                         checked = settings.enableEnhancer,
                         onCheckedChange = { onEnhancerToggle(it) },
@@ -129,21 +166,13 @@ fun PromptScreen(
         }
     }
 
-    val seedCard = @Composable {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(16.dp)
+    val seedSettingAccordion = @Composable {
+        AccordionSection(
+            title = "SEED SETTING",
+            isExpanded = seedExpanded,
+            onHeaderClick = { seedExpanded = !seedExpanded }
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "SEED SETTING",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // Seed Mode Selectors
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -176,7 +205,6 @@ fun PromptScreen(
                     }
                 }
 
-                // Dynamic Seed Inputs
                 when (settings.seedMode) {
                     SeedMode.Fixed -> {
                         Text(
@@ -225,20 +253,13 @@ fun PromptScreen(
         }
     }
 
-    val resolutionCard = @Composable {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(16.dp)
+    val resolutionAccordion = @Composable {
+        AccordionSection(
+            title = "RESOLUTION & ASPECT RATIO",
+            isExpanded = resolutionExpanded,
+            onHeaderClick = { resolutionExpanded = !resolutionExpanded }
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(
-                    "RESOLUTION & ASPECT RATIO",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 val megapixelOptions = listOf(
                     "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0",
                     "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "2.0",
@@ -273,7 +294,6 @@ fun PromptScreen(
                 var mpDropdownExpanded by remember { mutableStateOf(false) }
                 var arDropdownExpanded by remember { mutableStateOf(false) }
 
-                // Aspect Ratio Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -284,7 +304,6 @@ fun PromptScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Minus Button
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -302,17 +321,37 @@ fun PromptScreen(
                             Text("-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
 
-                        // Dropdown Selector Box
                         Box(
                             modifier = Modifier
-                                .width(160.dp)
+                                .width(200.dp)
                                 .height(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.surface)
-                                .clickable { arDropdownExpanded = true },
-                            contentAlignment = Alignment.Center
+                                .clickable { arDropdownExpanded = true }
+                                .padding(horizontal = 8.dp),
+                            contentAlignment = Alignment.CenterStart
                         ) {
-                            Text(settings.aspectRatio, color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, maxLines = 1, textAlign = TextAlign.Center)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AspectRatioIcon(aspectRatio = settings.aspectRatio)
+                                Text(
+                                    text = settings.aspectRatio,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             DropdownMenu(
                                 expanded = arDropdownExpanded,
                                 onDismissRequest = { arDropdownExpanded = false },
@@ -320,7 +359,15 @@ fun PromptScreen(
                             ) {
                                 aspectRatios.forEach { ar ->
                                     DropdownMenuItem(
-                                        text = { Text(ar, color = MaterialTheme.colorScheme.onSurface) },
+                                        text = {
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                AspectRatioIcon(aspectRatio = ar)
+                                                Text(ar, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                                            }
+                                        },
                                         onClick = {
                                             onAspectRatioChange(ar)
                                             arDropdownExpanded = false
@@ -330,7 +377,6 @@ fun PromptScreen(
                             }
                         }
 
-                        // Plus Button
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -350,7 +396,6 @@ fun PromptScreen(
                     }
                 }
 
-                // Megapixel Size Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -361,7 +406,6 @@ fun PromptScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Minus Button
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -379,7 +423,6 @@ fun PromptScreen(
                             Text("-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
 
-                        // Dropdown Selector Box
                         Box(
                             modifier = Modifier
                                 .width(90.dp)
@@ -407,7 +450,6 @@ fun PromptScreen(
                             }
                         }
 
-                        // Plus Button
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -493,11 +535,227 @@ fun PromptScreen(
         }
     }
 
+    val stylePresets = remember {
+        listOf(
+            StylePreset("Cinematic", "cinematic style, high detailed, dramatic lighting, 8k resolution", "🎬"),
+            StylePreset("Anime", "anime style, vibrant colors, detailed line art, masterpiece", "🌸"),
+            StylePreset("Photorealistic", "award-winning photo, 35mm lens, photorealistic, dslr, high detailed", "📷"),
+            StylePreset("3D Render", "3d render, octane render, detailed, trending on artstation, masterpiece", "📦"),
+            StylePreset("Cyberpunk", "cyberpunk style, neon lights, high tech, futuristic, detailed", "🏙️"),
+            StylePreset("Fantasy", "fantasy digital painting, ethereal, magical, highly detailed, artstation", "🔮"),
+            StylePreset("Comic Book", "comic book art style, bold lines, vibrant, detailed, hand-drawn", "💥")
+        )
+    }
+
+    val workflowSelectorAccordion = @Composable {
+        val activeWorkflowDisplay = when (settings.workflowToUse) {
+            "" -> "Default Workflow"
+            "imported_workflow.json" -> "Imported Local Workflow"
+            else -> settings.workflowToUse
+        }
+        AccordionSection(
+            title = "ACTIVE WORKFLOW",
+            isExpanded = workflowExpanded,
+            onHeaderClick = { workflowExpanded = !workflowExpanded }
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Current: $activeWorkflowDisplay",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    onClick = { showWorkflowSheet = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Change Workflow", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
+    val workflowStagesAccordion = @Composable {
+        if (workflowGroups.isNotEmpty()) {
+            AccordionSection(
+                title = "WORKFLOW STAGES (GROUPS)",
+                isExpanded = stagesExpanded,
+                onHeaderClick = { stagesExpanded = !stagesExpanded }
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val allEnabled = bypassedGroups.isEmpty()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onToggleAllGroups(!allEnabled) }
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ALL STAGES",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Switch(
+                            checked = allEnabled,
+                            onCheckedChange = { onToggleAllGroups(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), thickness = 1.dp)
+
+                    workflowGroups.forEach { group ->
+                        val isBypassed = bypassedGroups.contains(group)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onToggleGroupBypass(group) }
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = group,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isBypassed) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                            )
+                            Switch(
+                                checked = !isBypassed,
+                                onCheckedChange = { onToggleGroupBypass(group) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                    uncheckedTrackColor = MaterialTheme.colorScheme.surface
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    val stylePresetAccordion = @Composable {
+        AccordionSection(
+            title = "STYLE PRESET",
+            isExpanded = stylePresetExpanded,
+            onHeaderClick = { stylePresetExpanded = !stylePresetExpanded }
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = settings.selectedStylePreset == "",
+                        onClick = { onStylePresetChange("") },
+                        label = { Text("None") },
+                        leadingIcon = { Text("❌", fontSize = 12.sp) }
+                    )
+                    stylePresets.forEach { preset ->
+                        FilterChip(
+                            selected = settings.selectedStylePreset == preset.name,
+                            onClick = { onStylePresetChange(preset.name) },
+                            label = { Text(preset.name) },
+                            leadingIcon = { Text(preset.icon, fontSize = 12.sp) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    val inputImageAccordion = @Composable {
+        AccordionSection(
+            title = "INPUT IMAGE (IMAGE-TO-IMAGE / CONTROLNET)",
+            isExpanded = inputImageExpanded,
+            onHeaderClick = { inputImageExpanded = !inputImageExpanded }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (selectedImageUri != null) {
+                    AsyncImage(
+                        model = selectedImageUri,
+                        contentDescription = "Selected Image",
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Image Selected", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            text = "CLEAR",
+                            modifier = Modifier
+                                .clickable { selectedImageUri = null }
+                                .padding(vertical = 4.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentRed
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                            .clickable { imagePickerLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Photo", tint = MaterialTheme.colorScheme.primary)
+                            Text("Select Input Image...", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     val generateButton = @Composable {
         Button(
             onClick = {
                 if (prompt.isNotBlank()) {
-                    onGenerateClick(prompt)
+                    val finalPrompt = if (settings.selectedStylePreset.isNotEmpty()) {
+                        val cue = stylePresets.firstOrNull { it.name == settings.selectedStylePreset }?.cue
+                        if (cue != null) "$prompt, $cue" else prompt
+                    } else {
+                        prompt
+                    }
+                    onGenerateClick(finalPrompt, selectedImageUri)
                 } else {
                     Toast.makeText(context, "Please enter a prompt.", Toast.LENGTH_SHORT).show()
                 }
@@ -543,54 +801,226 @@ fun PromptScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        if (isExpandedScreen) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1.1f)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    promptInputCard()
-                    geminiStatusCard()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    generateButton()
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    seedCard()
-                    resolutionCard()
-                }
-            }
-        } else {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 160.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                promptInputCard()
-                seedCard()
-                resolutionCard()
-                geminiStatusCard()
-                Spacer(modifier = Modifier.height(16.dp))
-                generateButton()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(if (isExpandedScreen) 0.8f else 1f)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    workflowSelectorAccordion()
+                    promptInputAccordion()
+                    stylePresetAccordion()
+                    resolutionAccordion()
+                    if (workflowGroups.isNotEmpty()) {
+                        workflowStagesAccordion()
+                    }
+                    inputImageAccordion()
+                    seedSettingAccordion()
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.9f)
+                    )
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(if (isExpandedScreen) 0.8f else 1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    geminiStatusCard()
+                    generateButton()
+                }
+            }
+        }
+    }
+
+    if (showWorkflowSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showWorkflowSheet = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            scrimColor = Color.Black.copy(alpha = 0.6f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "SELECT WORKFLOW",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                // Option for Default Workflow
+                val isDefaultActive = settings.workflowToUse == ""
+                ListItem(
+                    headlineContent = { Text("Default Workflow (ernie_workflow.json)", fontWeight = if (isDefaultActive) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            onWorkflowChange("")
+                            showWorkflowSheet = false
+                        },
+                    colors = ListItemDefaults.colors(
+                        containerColor = if (isDefaultActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                    )
+                )
+
+                // Option for Imported Local Workflow if it exists
+                val importedFileExists = remember {
+                    context.getFileStreamPath("imported_workflow.json").exists()
+                }
+                if (importedFileExists) {
+                    val isImportedActive = settings.workflowToUse == "imported_workflow.json"
+                    ListItem(
+                        headlineContent = { Text("Imported Local Workflow (imported_workflow.json)", fontWeight = if (isImportedActive) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                onWorkflowChange("imported_workflow.json")
+                                showWorkflowSheet = false
+                            },
+                        colors = ListItemDefaults.colors(
+                            containerColor = if (isImportedActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                        )
+                    )
+                }
+
+                // Options for saved workflows
+                savedWorkflows.forEach { workflow ->
+                    val isActive = settings.workflowToUse == workflow
+                    ListItem(
+                        headlineContent = { Text(workflow, fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                onWorkflowChange(workflow)
+                                showWorkflowSheet = false
+                            },
+                        colors = ListItemDefaults.colors(
+                            containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                        )
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+fun AspectRatioIcon(
+    aspectRatio: String,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    modifier: Modifier = Modifier
+) {
+    val ratioStr = aspectRatio.substringBefore(" ").trim()
+    val parts = ratioStr.split(":")
+    val (wRatio, hRatio) = if (parts.size == 2) {
+        Pair(parts[0].toFloatOrNull() ?: 1f, parts[1].toFloatOrNull() ?: 1f)
+    } else {
+        Pair(1f, 1f)
+    }
+
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .border(1.5.dp, color.copy(alpha = 0.3f), RoundedCornerShape(4.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        val maxDim = 14.dp
+        val width: Dp
+        val height: Dp
+        if (wRatio >= hRatio) {
+            width = maxDim
+            height = maxDim * (hRatio / wRatio)
+        } else {
+            height = maxDim
+            width = maxDim * (wRatio / hRatio)
+        }
+        Box(
+            modifier = Modifier
+                .size(width, height)
+                .border(1.5.dp, color, RoundedCornerShape(1.dp))
+                .background(color.copy(alpha = 0.15f))
+        )
+    }
+}
+
+@Composable
+fun AccordionSection(
+    title: String,
+    isExpanded: Boolean,
+    onHeaderClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onHeaderClick() }
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isExpanded,
+                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                ) {
+                    content()
+                }
+            }
+        }
+    }
+}
+
+

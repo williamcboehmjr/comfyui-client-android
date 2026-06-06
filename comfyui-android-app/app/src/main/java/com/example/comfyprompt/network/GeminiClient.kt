@@ -258,7 +258,7 @@ object GeminiClient {
                 }
             }
         } catch (e: Exception) {
-            AppLogger.e("GeminiClient", "Prompt enhancement failed due to an exception")
+            AppLogger.e("GeminiClient", "Prompt enhancement failed due to an exception", e)
             userPrompt
         }
     }
@@ -293,7 +293,7 @@ object GeminiClient {
                 models
             }
         } catch (e: Exception) {
-            AppLogger.e("GeminiClient", "Failed to fetch local models due to an exception")
+            AppLogger.e("GeminiClient", "Failed to fetch local models due to an exception", e)
             emptyList()
         }
     }

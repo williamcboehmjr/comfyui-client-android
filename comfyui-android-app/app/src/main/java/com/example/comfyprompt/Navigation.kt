@@ -35,6 +35,9 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
     val progressInfo by viewModel.progressInfo.collectAsState()
     val prompt by viewModel.currentPrompt.collectAsState()
     val cooldownSeconds by viewModel.generateCooldownSeconds.collectAsState()
+    val savedWorkflows by viewModel.savedWorkflows.collectAsState()
+    val workflowGroups by viewModel.workflowGroups.collectAsState()
+    val bypassedGroups by viewModel.bypassedGroups.collectAsState()
 
     val queueJobs by viewModel.queueList.collectAsState()
     val activeJobId by viewModel.activeJobId.collectAsState()
@@ -123,8 +126,8 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                         prompt = prompt,
                         onPromptChange = { viewModel.updatePrompt(it) },
                         settings = settings,
-                        onGenerateClick = { promptText ->
-                            viewModel.generateImage(promptText)
+                        onGenerateClick = { promptText, imageUri ->
+                            viewModel.generateImage(promptText, imageUri)
                             Toast.makeText(context, "Prompt added to queue", Toast.LENGTH_SHORT).show()
                             backStack.add(Progress)
                         },
@@ -149,6 +152,19 @@ fun MainNavigation(viewModel: MainViewModel = viewModel()) {
                             val updated = settings.copy(aspectRatio = ar)
                             viewModel.updateSettings(updated)
                         },
+                        onStylePresetChange = { preset ->
+                            val updated = settings.copy(selectedStylePreset = preset)
+                            viewModel.updateSettings(updated)
+                        },
+                        savedWorkflows = savedWorkflows,
+                        onWorkflowChange = { workflow ->
+                            val updated = settings.copy(workflowToUse = workflow)
+                            viewModel.updateSettings(updated)
+                        },
+                        workflowGroups = workflowGroups,
+                        bypassedGroups = bypassedGroups,
+                        onToggleGroupBypass = { viewModel.toggleGroupBypass(it) },
+                        onToggleAllGroups = { enableAll -> viewModel.toggleAllGroups(enableAll) },
                         cooldownSeconds = cooldownSeconds
                     )
                 }

@@ -2,9 +2,12 @@ package com.example.comfyprompt.ui.screens
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -185,12 +188,18 @@ fun ProgressScreen(
                     stopButton()
                 }
 
-                Box(
+                Column(
                     modifier = Modifier
                         .weight(1.3f)
-                        .fillMaxHeight()
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    imageCanvas()
+                    StageStepper(currentStage = progressInfo.currentStage)
+                    Box(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        imageCanvas()
+                    }
                 }
             }
         } else {
@@ -205,7 +214,9 @@ fun ProgressScreen(
                 promptSummaryCard()
                 Spacer(modifier = Modifier.height(24.dp))
                 progressIndicators()
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                StageStepper(currentStage = progressInfo.currentStage)
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Box(
                     modifier = Modifier
@@ -217,6 +228,101 @@ fun ProgressScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 stopButton()
+            }
+        }
+    }
+}
+
+@Composable
+fun StageStepper(
+    currentStage: String,
+    modifier: Modifier = Modifier
+) {
+    val stages = listOf("Load Model", "Encode", "Sampler", "Decode", "Save")
+    val currentIndex = stages.indexOf(currentStage)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        stages.forEachIndexed { index, stage ->
+            val isCompleted = currentIndex > index
+            val isActive = currentIndex == index
+
+            // Circle indicator
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(
+                        when {
+                            isCompleted -> SuccessGreen
+                            isActive -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        color = when {
+                            isCompleted -> SuccessGreen
+                            isActive -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.outline
+                        },
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isCompleted) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(14.dp)
+                    )
+                } else {
+                    Text(
+                        text = (index + 1).toString(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Text Label
+            Spacer(modifier = Modifier.width(6.dp))
+            Column(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = stage,
+                    fontSize = 11.sp,
+                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
+                    color = when {
+                        isCompleted -> SuccessGreen
+                        isActive -> MaterialTheme.colorScheme.onSurface
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Connecting line if not the last stage
+            if (index < stages.lastIndex) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(2.dp)
+                        .background(
+                            if (isCompleted) SuccessGreen else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                        )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
             }
         }
     }

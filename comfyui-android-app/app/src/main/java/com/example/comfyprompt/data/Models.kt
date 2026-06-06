@@ -62,7 +62,8 @@ data class AppSettings(
     val triggerCmdEnabled: Boolean = false,
     val triggerCmdToken: String = "",
     val triggerCmdName: String = "Comfy_Start",
-    val triggerCmdComputer: String = ""
+    val triggerCmdComputer: String = "",
+    val selectedStylePreset: String = ""
 )
 
 data class ProgressInfo(
@@ -73,7 +74,9 @@ data class ProgressInfo(
     val baseImage: String? = null,      // Image view path/URL
     val upscaleImage: String? = null,   // Image view path/URL
     val finalImage: String? = null,     // Image view path/URL
-    val enhancedPrompt: String? = null  // Enhanced prompt from Gemini
+    val enhancedPrompt: String? = null, // Enhanced prompt from Gemini
+    val currentStage: String = "",
+    val activeNodeStages: Map<String, String>? = null
 )
 
 data class GalleryItem(
@@ -137,7 +140,9 @@ data class QueueJob(
     val prompt: String,
     val timestamp: Long = System.currentTimeMillis(),
     val progress: ProgressInfo = ProgressInfo(),
-    val settings: AppSettings
+    val settings: AppSettings,
+    val inputImageUri: String? = null,
+    val bypassedGroups: List<String> = emptyList()
 )
 
 enum class MessageSender {

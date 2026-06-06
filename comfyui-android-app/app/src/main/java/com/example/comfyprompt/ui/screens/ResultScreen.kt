@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,13 +20,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.comfyprompt.data.AppSettings
 import com.example.comfyprompt.theme.AccentGray
+import com.example.comfyprompt.theme.AccentRed
 import com.example.comfyprompt.theme.SuccessGreen
 
 @Composable
@@ -47,6 +53,58 @@ fun ResultScreen(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isExpandedScreen = configuration.screenWidthDp >= 600
+    val clipboardManager = LocalClipboardManager.current
+    val progressInfo by viewModel.progressInfo.collectAsState()
+    val enhancedPrompt = progressInfo.enhancedPrompt
+    var isPromptFullScreen by remember { mutableStateOf(false) }
+
+    val enhancedPromptCard = @Composable {
+        if (!enhancedPrompt.isNullOrBlank()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "✨ ENHANCED PROMPT (TAP TO EXPAND)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SuccessGreen
+                        )
+                        Text(
+                            text = "COPY",
+                            modifier = Modifier
+                                .clickable {
+                                    clipboardManager.setText(AnnotatedString(enhancedPrompt))
+                                    android.widget.Toast.makeText(context, "Copied to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = enhancedPrompt,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .clickable { isPromptFullScreen = true }
+                            .fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -146,8 +204,9 @@ fun ResultScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        BackHandler(enabled = isFullScreen) {
+        BackHandler(enabled = isFullScreen || isPromptFullScreen) {
             isFullScreen = false
+            isPromptFullScreen = false
         }
 
         Scaffold(
@@ -266,6 +325,7 @@ fun ResultScreen(
                             if (settings.enableEnhancer) {
                                 copilotButton()
                             }
+                            enhancedPromptCard()
                             Spacer(modifier = Modifier.height(16.dp))
                             saveButton()
                         }
@@ -342,6 +402,8 @@ fun ResultScreen(
                             imageCanvas()
                         }
 
+                        enhancedPromptCard()
+
                         if (settings.enableEnhancer) {
                             Row(
                                 modifier = Modifier
@@ -411,6 +473,53 @@ fun ResultScreen(
                     shape = androidx.compose.ui.graphics.RectangleShape,
                     onTap = { isFullScreen = false }
                 )
+            }
+        }
+
+        // Full Screen Prompt Overlay
+        AnimatedVisibility(
+            visible = isPromptFullScreen,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.95f))
+                    .clickable { isPromptFullScreen = false }
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "✨ ENHANCED PROMPT",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SuccessGreen,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Text(
+                        text = enhancedPrompt ?: "",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 26.sp
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Tap anywhere to close",
+                        fontSize = 12.sp,
+                        color = AccentGray,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
