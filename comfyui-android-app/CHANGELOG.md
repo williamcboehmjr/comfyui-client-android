@@ -27,7 +27,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### 🎨 Material 3 Design Upgrades
 - **Dynamic Colors (Monet Engine)**: Added support for wallpaper-matched dynamic dark color schemes on Android 12+ (API 31+).
 - **Fallback Palette**: Re-designed theme colors to utilize a premium dark-slate background (`SlateBg`), deep slate cards (`SlateSurfaceVariant`), matching borders, and soft indigo primary accents.
-- **Semantic Theme Tokens**: Refactored all UI screens (Prompt, Settings, Progress, Result, Copilot, Gallery, ServerWake, QueueComponents, and Logs) to completely remove hardcoded, static color references (`CardGray`, `DarkGray`, `LightGray`) and retrieve them dynamically via `MaterialTheme.colorScheme`.
+- **Semantic Theme Tokens**: Refactored all UI screens (Prompt, Settings, Progress, Result, Image Refiner Chat, Gallery, ServerWake, QueueComponents, and Logs) to completely remove hardcoded, static color references (`CardGray`, `DarkGray`, `LightGray`) and retrieve them dynamically via `MaterialTheme.colorScheme`.
 - **Refined Typography Scale**: Tuned semantic typographic roles (headlines, body, and label text) inside `Type.kt` with custom font weights and line spacings.
 
 ---
@@ -44,10 +44,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.0] - 2026-06-05
 
 ### 🏗️ Architecture Refactor
-- **Modular Screen Architecture**: Completely decoupled the monolithic `Screens.kt` file into individual, focused screen files under `ui/screens/` — each screen (Prompt, Progress, Result, Settings, Gallery, Copilot, ServerWake, ZoomableImage) is now its own Kotlin file for far better maintainability and readability.
+- **Modular Screen Architecture**: Completely decoupled the monolithic `Screens.kt` file into individual, focused screen files under `ui/screens/` — each screen (Prompt, Progress, Result, Settings, Gallery, Image Refiner Chat, ServerWake, ZoomableImage) is now its own Kotlin file for far better maintainability and readability.
 - **`GenerationRepository`**: Introduced a dedicated repository class that owns all generation logic and runs on a `SupervisorJob`-backed `repositoryScope` so generation state survives Activity pauses, rotations, and backgrounding.
 - **`WorkflowTransformer`**: Extracted prompt injection into its own utility class. Recursively walks the ComfyUI API-format graph to inject the (optionally enhanced) text prompt into `CLIPTextEncode` or `PrimitiveNode` nodes, removing the dependency on brittle index assumptions.
-- **`CopilotChatManager`**: Moved all Gemini vision-chat state and history into a dedicated manager class, decoupling it completely from the ViewModel.
+- **`ImageRefinerChatManager`**: Moved all Gemini vision-chat state and history into a dedicated manager class, decoupling it completely from the ViewModel.
 - **`MediaSaver`**: Extracted local media-save logic (including `MediaStore` operations) into a dedicated utility class.
 
 ### ✨ New Features
